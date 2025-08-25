@@ -30,8 +30,8 @@ return new class extends Migration
             $table->string('state_code')->nullable();
             $table->string('postal_code')->nullable();
             $table->string('country')->nullable();
-            $table->double('latitude')->nullable();
-            $table->double('longitude')->nullable();
+            $table->string('latitude')->nullable();
+            $table->string('longitude')->nullable();
             $table->json('business_hours')->nullable();
             $table->json('services')->nullable();
             $table->boolean('is_approved')->default(false);
