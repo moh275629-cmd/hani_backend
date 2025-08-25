@@ -293,15 +293,12 @@ class AuthController extends Controller
 
             // Accept any valid, unused OTP matching the provided code for this identifier/type
             $otp = Otp::forIdentifier($request->identifier)
-                ->ofType($request->type)->where('otp', $request->otp);
+                ->ofType($request->type)
+                ->where('otp', $request->otp)
+                ->where('is_used', false)
+                ->where('expires_at', '>', now())
+                ->first();
             
-            if (!$otp || $otp->otp !== $request->otp || 
-                $otp->type !== $request->type || 
-                $otp->isExpired() || 
-                $otp->is_used) {
-                $otp = null; // Reset to null if any condition fails
-            }
-
             if (!$otp) {
                 return response()->json([
                     'success' => false,
