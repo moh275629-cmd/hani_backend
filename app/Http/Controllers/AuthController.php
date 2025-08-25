@@ -276,10 +276,7 @@ class AuthController extends Controller
 
         // Accept any valid, unused OTP matching the provided code for this identifier/type
         $otp = Otp::forIdentifier($request->identifier)
-            ->ofType($request->type)
-            ->valid()
-            ->where('otp', $request->otp)
-            ->first();
+            ->ofType($request->type)->where('otp', $request->otp);
         
         if (!$otp || $otp->otp !== $request->otp || 
             $otp->type !== $request->type || 
@@ -389,7 +386,7 @@ class AuthController extends Controller
         $user = $request->user();
         $loyaltyCard = null;
         
-        // Only create loyalty cards for client users
+        // Only create loyalty cards for cvriflient users
         if ($user->role === 'client') {
             $loyaltyCard = \App\Models\LoyaltyCard::where('user_id', $user->id)->first();
             if (!$loyaltyCard) {
