@@ -16,7 +16,7 @@ return new class extends Migration
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->foreignId('store_id')->nullable()->constrained()->onDelete('cascade');
             $table->string('card_number')->unique();
-            $table->string('qr_code')->unique();
+            $table->longText('qr_code')->unique();
             $table->timestamps();
             
             $table->index(['user_id', 'store_id']);
