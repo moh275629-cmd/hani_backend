@@ -1,0 +1,603 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Store;
+use App\Models\Offer;
+use App\Models\User;
+use Illuminate\Http\Request;
+use Illuminate\Http\Response;
+
+class ImageController extends Controller
+{
+    /**
+     * Serve store logo image
+     */
+    public function storeLogo($storeId)
+    {
+        $store = Store::findOrFail($storeId);
+        
+        if (!$store->hasLogoBlob()) {
+            return response()->json(['error' => 'Logo not found'], 404);
+        }
+
+        $imageData = $store->getLogoBlob();
+        
+        return response($imageData)
+            ->header('Content-Type', 'image/jpeg')
+            ->header('Cache-Control', 'public, max-age=31536000');
+    }
+
+    /**
+     * Serve store banner image
+     */
+    public function storeBanner($storeId)
+    {
+        $store = Store::findOrFail($storeId);
+        
+        if (!$store->hasBannerBlob()) {
+            return response()->json(['error' => 'Banner not found'], 404);
+        }
+
+        $imageData = $store->getBannerBlob();
+        
+        return response($imageData)
+            ->header('Content-Type', 'image/jpeg')
+            ->header('Cache-Control', 'public, max-age=31536000');
+    }
+
+    /**
+     * Serve offer image
+     */
+    public function offerImage($offerId)
+    {
+        try {
+            \Log::info('offerImage called with offerId: ' . $offerId);
+            
+            $offer = Offer::findOrFail($offerId);
+            \Log::info('Offer found: ' . $offer->id . ', title: ' . $offer->title);
+            
+            \Log::info('Offer has image_blob field: ' . (isset($offer->image_blob) ? 'yes' : 'no'));
+            \Log::info('image_blob size: ' . (isset($offer->image_blob) ? strlen($offer->image_blob) : 'not set'));
+            
+            if (!$offer->hasImageBlob()) {
+                \Log::info('Offer does not have image blob, returning default placeholder');
+                
+                // Return a default placeholder image instead of 404
+                $placeholderPath = public_path('images/placeholder-offer.png');
+                
+                if (file_exists($placeholderPath)) {
+                    $imageData = file_get_contents($placeholderPath);
+                    return response($imageData)
+                        ->header('Content-Type', 'image/png')
+                        ->header('Cache-Control', 'public, max-age=31536000');
+                } else {
+                    // If no placeholder exists, return a simple 1x1 transparent PNG
+                    $transparentPng = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==');
+                    return response($transparentPng)
+                        ->header('Content-Type', 'image/png')
+                        ->header('Cache-Control', 'public, max-age=31536000');
+                }
+            }
+
+            $imageData = $offer->getImageBlob();
+            \Log::info('Retrieved image data size: ' . strlen($imageData));
+            
+            if (empty($imageData)) {
+                \Log::warning('Image data is empty after retrieval');
+                return response()->json(['error' => 'Image data is empty'], 404);
+            }
+            
+            return response($imageData)
+                ->header('Content-Type', 'image/jpeg')
+                ->header('Cache-Control', 'public, max-age=31536000');
+        } catch (\Exception $e) {
+            \Log::error('Error in offerImage: ' . $e->getMessage());
+            \Log::error('Stack trace: ' . $e->getTraceAsString());
+            
+            return response()->json([
+                'error' => 'Failed to retrieve image',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Upload store logo
+     */
+    public function uploadStoreLogo(Request $request, $storeId)
+    {
+        $request->validate([
+            'image' => 'required|image|mimes:jpeg,png,jpg|max:2048'
+        ]);
+
+        $store = Store::findOrFail($storeId);
+        
+        $imageFile = $request->file('image');
+        $imageData = file_get_contents($imageFile->getRealPath());
+        
+        $store->setLogoBlob($imageData);
+        
+        return response()->json([
+            'message' => 'Logo uploaded successfully',
+            'store_id' => $storeId,
+            'image_url' => "/api/images/store/{$storeId}/logo"
+        ]);
+    }
+
+    /**
+     * Upload store banner
+     */
+    public function uploadStoreBanner(Request $request, $storeId)
+    {
+        $request->validate([
+            'image' => 'required|image|mimes:jpeg,png,jpg|max:5120'
+        ]);
+
+        $store = Store::findOrFail($storeId);
+        
+        $imageFile = $request->file('image');
+        $imageData = file_get_contents($imageFile->getRealPath());
+        
+        $store->setBannerBlob($imageData);
+        
+        return response()->json([
+            'message' => 'Banner uploaded successfully',
+            'store_id' => $storeId,
+            'image_url' => "/api/images/store/{$storeId}/banner"
+        ]);
+    }
+
+    /**
+     * Upload offer image
+     */
+    public function uploadOfferImage(Request $request, $offerId)
+    {
+        $request->validate([
+            'image' => 'required|image|mimes:jpeg,png,jpg|max:2048'
+        ]);
+
+        $offer = Offer::findOrFail($offerId);
+        
+        $imageFile = $request->file('image');
+        $imageData = file_get_contents($imageFile->getRealPath());
+        
+        $offer->setImageBlob($imageData);
+        
+        return response()->json([
+            'message' => 'Offer image uploaded successfully',
+            'offer_id' => $offerId,
+            'image_url' => "/api/images/offer/{$offerId}"
+        ]);
+    }
+
+    /**
+     * Upload temporary offer image (for new offers)
+     */
+    public function uploadTempOfferImage(Request $request)
+    {
+        $request->validate([
+            'image' => 'required|image|mimes:jpeg,png,jpg|max:2048'
+        ]);
+
+        $imageFile = $request->file('image');
+        $imageData = file_get_contents($imageFile->getRealPath());
+        
+        // Generate a temporary ID
+        $tempId = 'temp_' . uniqid();
+        
+        // Store in temporary file instead of session
+        $tempPath = storage_path('app/temp/' . $tempId . '.jpg');
+        
+        // Ensure temp directory exists
+        if (!file_exists(dirname($tempPath))) {
+            mkdir(dirname($tempPath), 0755, true);
+        }
+        
+        // Save the image to temporary file
+        file_put_contents($tempPath, $imageData);
+        
+        return response()->json([
+            'message' => 'Temporary offer image uploaded successfully',
+            'temp_id' => $tempId,
+            'image_url' => "/api/images/temp/{$tempId}",
+            'debug' => [
+                'temp_path' => $tempPath,
+                'file_exists' => file_exists($tempPath),
+                'data_size' => strlen($imageData),
+                'file_size' => file_exists($tempPath) ? filesize($tempPath) : 0
+            ]
+        ]);
+    }
+
+    /**
+     * Upload temporary store logo (for new stores)
+     */
+    public function uploadTempStoreLogo(Request $request)
+    {
+        $request->validate([
+            'image' => 'required|image|mimes:jpeg,png,jpg|max:2048'
+        ]);
+
+        $imageFile = $request->file('image');
+        $imageData = file_get_contents($imageFile->getRealPath());
+        
+        // Generate a temporary ID
+        $tempId = 'temp_logo_' . uniqid();
+        
+        // Store in temporary file instead of session
+        $tempPath = storage_path('app/temp/' . $tempId . '.jpg');
+        
+        // Ensure temp directory exists
+        if (!file_exists(dirname($tempPath))) {
+            mkdir(dirname($tempPath), 0755, true);
+        }
+        
+        // Save the image to temporary file
+        file_put_contents($tempPath, $imageData);
+        
+        return response()->json([
+            'message' => 'Temporary store logo uploaded successfully',
+            'temp_id' => $tempId,
+            'image_url' => "/api/images/temp/{$tempId}"
+        ]);
+    }
+
+    /**
+     * Upload temporary store banner (for new stores)
+     */
+    public function uploadTempStoreBanner(Request $request)
+    {
+        $request->validate([
+            'image' => 'required|image|mimes:jpeg,png,jpg|max:5120'
+        ]);
+
+        $imageFile = $request->file('image');
+        $imageData = file_get_contents($imageFile->getRealPath());
+        
+        // Generate a temporary ID
+        $tempId = 'temp_banner_' . uniqid();
+        
+        // Store in temporary file instead of session
+        $tempPath = storage_path('app/temp/' . $tempId . '.jpg');
+        
+        // Ensure temp directory exists
+        if (!file_exists(dirname($tempPath))) {
+            mkdir(dirname($tempPath), 0755, true);
+        }
+        
+        // Save the image to temporary file
+        file_put_contents($tempPath, $imageData);
+        
+        return response()->json([
+            'message' => 'Temporary store banner uploaded successfully',
+            'temp_id' => $tempId,
+            'image_url' => "/api/images/temp/{$tempId}"
+        ]);
+    }
+
+    /**
+     * Serve temporary image
+     */
+    public function serveTempImage($tempId)
+    {
+        $tempPath = storage_path('app/temp/' . $tempId . '.jpg');
+        
+        if (!file_exists($tempPath)) {
+            return response()->json(['error' => 'Temporary image not found', 'temp_id' => $tempId, 'path' => $tempPath], 404);
+        }
+        
+        $imageData = file_get_contents($tempPath);
+        
+        if (!$imageData) {
+            return response()->json(['error' => 'Temporary image data is empty', 'temp_id' => $tempId], 404);
+        }
+        
+        // Try to detect image type from the data
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mimeType = finfo_buffer($finfo, $imageData);
+        finfo_close($finfo);
+        
+        // If we can't detect the type, default to jpeg
+        if (!$mimeType || !str_starts_with($mimeType, 'image/')) {
+            $mimeType = 'image/jpeg';
+        }
+        
+        return response($imageData)
+            ->header('Content-Type', $mimeType)
+            ->header('Cache-Control', 'public, max-age=3600'); // 1 hour cache for temp images
+    }
+
+    /**
+     * Move temporary offer image to permanent offer image
+     */
+    public function moveTempOfferImage(Request $request, $offerId)
+    {
+        try {
+            \Log::info('moveTempOfferImage called with offerId: ' . $offerId);
+            \Log::info('Request data: ' . json_encode($request->all()));
+            
+            $request->validate([
+                'temp_id' => 'required|string'
+            ]);
+
+            $tempId = $request->input('temp_id');
+            \Log::info('Temp ID: ' . $tempId);
+            
+            $tempPath = storage_path('app/temp/' . $tempId . '.jpg');
+            
+            // Get the temporary image from file
+            if (!file_exists($tempPath)) {
+                \Log::error('Temporary image file not found: ' . $tempPath);
+                return response()->json(['error' => 'Temporary image file not found', 'temp_id' => $tempId, 'path' => $tempPath], 404);
+            }
+            
+            $imageData = file_get_contents($tempPath);
+            
+            if (!$imageData) {
+                \Log::error('Temporary image data is empty for temp_id: ' . $tempId);
+                return response()->json(['error' => 'Temporary image data is empty', 'temp_id' => $tempId], 404);
+            }
+
+            // Find the offer
+            \Log::info('Looking for offer with ID: ' . $offerId);
+            $offer = Offer::findOrFail($offerId);
+            \Log::info('Found offer: ' . $offer->id);
+            
+            // Debug: Check offer before update (only size, not content)
+            $beforeBlobSize = $offer->image_blob ? strlen($offer->image_blob) : 0;
+            
+            // Debug: Check offer attributes
+            $offerAttributes = $offer->getAttributes();
+            $hasImageBlobField = array_key_exists('image_blob', $offerAttributes);
+            
+            // Debug: Check database directly
+            $dbCheck = \DB::select("DESCRIBE offers");
+            $imageBlobColumn = collect($dbCheck)->firstWhere('Field', 'image_blob');
+            $imageBlobColumnInfo = $imageBlobColumn ? (array) $imageBlobColumn : null;
+            
+            // Debug: Check current value in database (only size)
+            $currentDbValue = \DB::table('offers')->where('id', $offerId)->value('image_blob');
+            $currentDbValueSize = $currentDbValue ? strlen($currentDbValue) : 0;
+            
+            // Set the image blob
+            $offer->setImageBlob($imageData);
+            
+            // Debug: Check offer after setting blob (only size)
+            $afterBlobSize = $offer->image_blob ? strlen($offer->image_blob) : 0;
+            
+            // Debug: Check if the attribute was set (only size)
+            $offerAttributesAfter = $offer->getAttributes();
+            $imageBlobAfter = $offerAttributesAfter['image_blob'] ?? null;
+            $imageBlobAfterSize = $imageBlobAfter ? strlen($imageBlobAfter) : 0;
+            
+            // Save the changes
+            $saved = $offer->save();
+            
+            // Debug: Check offer after save (only size)
+            $offer->refresh(); // Reload from database
+            $finalBlobSize = $offer->image_blob ? strlen($offer->image_blob) : 0;
+            
+            // Fallback: Direct database update if the model save didn't work
+            $dbError = null;
+            if ($finalBlobSize === 0 && $imageData) {
+                try {
+                    \DB::table('offers')
+                        ->where('id', $offerId)
+                        ->update(['image_blob' => $imageData]);
+                    
+                    // Check again
+                    $offer->refresh();
+                    $finalBlobSize = $offer->image_blob ? strlen($offer->image_blob) : 0;
+                } catch (\Exception $e) {
+                    $dbError = $e->getMessage();
+                }
+            }
+            
+            // Remove the temporary file
+            if (file_exists($tempPath)) {
+                unlink($tempPath);
+            }
+            
+            return response()->json([
+                'message' => 'Temporary image moved to offer successfully',
+                'offer_id' => $offerId,
+                'image_url' => "/api/images/offer/{$offerId}",
+                'debug' => [
+                    'temp_id' => $tempId,
+                    'image_size' => strlen($imageData),
+                    'before_blob_size' => $beforeBlobSize,
+                    'has_image_blob_field' => $hasImageBlobField,
+                    'db_column_info' => $imageBlobColumnInfo,
+                    'current_db_value_size' => $currentDbValueSize,
+                    'after_setting_blob_size' => $afterBlobSize,
+                    'after_setting_attribute_size' => $imageBlobAfterSize,
+                    'after_save_blob_size' => $finalBlobSize,
+                    'save_successful' => $saved,
+                    'temp_file_deleted' => !file_exists($tempPath),
+                    'db_error' => $dbError,
+                    'offer_attributes_keys' => array_keys($offerAttributes),
+                    'image_blob_field_exists' => isset($offerAttributes['image_blob'])
+                ]
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Error in moveTempOfferImage: ' . $e->getMessage());
+            \Log::error('Stack trace: ' . $e->getTraceAsString());
+            
+            return response()->json([
+                'error' => 'Failed to move temporary image',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Serve user profile image
+     */
+    public function userProfileImage($userId)
+    {
+        $user = User::findOrFail($userId);
+        
+        if (!$user->hasProfileImageBlob()) {
+            return response()->json(['error' => 'Profile image not found'], 404);
+        }
+
+        $imageData = $user->getProfileImageBlob();
+        
+        return response($imageData)
+            ->header('Content-Type', 'image/jpeg')
+            ->header('Cache-Control', 'public, max-age=31536000');
+    }
+
+    /**
+     * Upload temporary profile image
+     */
+    public function uploadTempProfileImage(Request $request)
+    {
+        $request->validate([
+            'image' => 'required|image|mimes:jpeg,png,jpg|max:2048'
+        ]);
+
+        $imageFile = $request->file('image');
+        $imageData = file_get_contents($imageFile->getRealPath());
+        
+        // Generate a temporary ID
+        $tempId = 'temp_profile_' . uniqid();
+        
+        // Store in temporary file
+        $tempPath = storage_path('app/temp/' . $tempId . '.jpg');
+        
+        // Ensure temp directory exists
+        if (!file_exists(dirname($tempPath))) {
+            mkdir(dirname($tempPath), 0755, true);
+        }
+        
+        // Save the image to temporary file
+        file_put_contents($tempPath, $imageData);
+        
+        return response()->json([
+            'message' => 'Temporary profile image uploaded successfully',
+            'temp_id' => $tempId,
+            'image_url' => "/api/images/temp/{$tempId}"
+        ]);
+    }
+
+    /**
+     * Move temporary profile image to permanent profile image
+     */
+    public function moveTempProfileImage(Request $request)
+    {
+        try {
+            $request->validate([
+                'temp_id' => 'required|string'
+            ]);
+
+            $tempId = $request->input('temp_id');
+            $tempPath = storage_path('app/temp/' . $tempId . '.jpg');
+            
+            // Get the temporary image from file
+            if (!file_exists($tempPath)) {
+                return response()->json(['error' => 'Temporary image file not found', 'temp_id' => $tempId], 404);
+            }
+            
+            $imageData = file_get_contents($tempPath);
+            
+            if (!$imageData) {
+                return response()->json(['error' => 'Temporary image data is empty', 'temp_id' => $tempId], 404);
+            }
+
+            // Get the authenticated user
+            $user = auth()->user();
+            
+            // Set the profile image blob
+            $user->setProfileImageBlob($imageData);
+            
+            // Also set the profile_image field with the URL
+            $user->profile_image = "/api/images/user/{$user->id}/profile";
+            
+            $user->save();
+            
+            // Remove the temporary file
+            if (file_exists($tempPath)) {
+                unlink($tempPath);
+            }
+            
+            return response()->json([
+                'message' => 'Profile image updated successfully',
+                'user_id' => $user->id,
+                'image_url' => "/api/images/user/{$user->id}/profile"
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Error in moveTempProfileImage: ' . $e->getMessage());
+            \Log::error('Stack trace: ' . $e->getTraceAsString());
+            
+            return response()->json([
+                'error' => 'Failed to move temporary profile image',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Move temporary store logo to permanent store logo
+     */
+    public function moveTempStoreLogo(Request $request, $storeId)
+    {
+        try {
+            \Log::info('moveTempStoreLogo called with storeId: ' . $storeId);
+            \Log::info('Request data: ' . json_encode($request->all()));
+            
+            $request->validate([
+                'temp_id' => 'required|string'
+            ]);
+
+            $tempId = $request->input('temp_id');
+            \Log::info('Temp ID: ' . $tempId);
+            
+            $tempPath = storage_path('app/temp/' . $tempId . '.jpg');
+            
+            // Get the temporary image from file
+            if (!file_exists($tempPath)) {
+                \Log::error('Temporary image file not found: ' . $tempPath);
+                return response()->json(['error' => 'Temporary image file not found', 'temp_id' => $tempId, 'path' => $tempPath], 404);
+            }
+            
+            $imageData = file_get_contents($tempPath);
+            
+            if (!$imageData) {
+                \Log::error('Temporary image data is empty for temp_id: ' . $tempId);
+                return response()->json(['error' => 'Temporary image data is empty', 'temp_id' => $tempId], 404);
+            }
+
+            // Find the store
+            \Log::info('Looking for store with ID: ' . $storeId);
+            $store = Store::findOrFail($storeId);
+            \Log::info('Found store: ' . $store->id);
+            
+            // Set the logo blob
+            $store->setLogoBlob($imageData);
+            
+            // Save the changes
+            $saved = $store->save();
+            
+            // Remove the temporary file
+            if (file_exists($tempPath)) {
+                unlink($tempPath);
+            }
+            
+            return response()->json([
+                'message' => 'Store logo updated successfully',
+                'store_id' => $storeId,
+                'image_url' => "/api/images/store/{$storeId}/logo"
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Error in moveTempStoreLogo: ' . $e->getMessage());
+            \Log::error('Stack trace: ' . $e->getTraceAsString());
+            
+            return response()->json([
+                'error' => 'Failed to move temporary store logo',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+}

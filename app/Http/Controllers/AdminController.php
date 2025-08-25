@@ -1,0 +1,1072 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\User;
+use App\Models\Store;
+use App\Models\Branch;
+use App\Models\Offer;
+use App\Models\Purchase;
+use App\Models\LoyaltyCard;
+use App\Models\Notification;
+use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\DB;
+
+class AdminController extends Controller
+{
+    /**
+     * Get admin dashboard statistics
+     */
+    public function dashboard(): JsonResponse
+    {
+        try {
+            $stats = [
+                'total_users' => User::count(),
+                'active_users' => User::where('is_active', true)->count(),
+                'total_stores' => Store::count(),
+                'approved_stores' => Store::where('is_approved', true)->count(),
+                'pending_stores' => Store::where('is_approved', false)->count(),
+                'total_offers' => Offer::count(),
+                'active_offers' => Offer::where('is_active', true)->count(),
+                'total_purchases' => Purchase::count(),
+                'total_revenue' => Purchase::sum('final_amount'),
+                'total_points_issued' => LoyaltyCard::sum('points'),
+            ];
+
+            // Monthly statistics for the last 6 months
+            $monthlyStats = [];
+            for ($i = 5; $i >= 0; $i--) {
+                $date = now()->subMonths($i);
+                $monthlyStats[] = [
+                    'month' => $date->format('M Y'),
+                    'users' => User::whereMonth('created_at', $date->month)
+                        ->whereYear('created_at', $date->year)->count(),
+                    'purchases' => Purchase::whereMonth('purchase_date', $date->month)
+                        ->whereYear('purchase_date', $date->year)->count(),
+                    'revenue' => Purchase::whereMonth('purchase_date', $date->month)
+                        ->whereYear('purchase_date', $date->year)->sum('final_amount'),
+                ];
+            }
+
+            return response()->json([
+                'message' => 'Dashboard statistics retrieved successfully',
+                'data' => [
+                    'overview' => $stats,
+                    'monthly_trends' => $monthlyStats
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Error retrieving dashboard statistics',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get all users with pagination and filters
+     */
+    public function users(Request $request): JsonResponse
+    {
+        try {
+            $query = User::with(['loyaltyCards', 'stores']);
+            $currentUser = auth()->user();
+
+            // Apply role-based filtering
+            if ($currentUser->isAdmin() && !$currentUser->isGlobalAdmin()) {
+                // Regional admin can only see users from their state
+                $query->where('state', $currentUser->state);
+            }
+            // Global admin can see all users
+
+            // Apply filters
+            if ($request->has('search')) {
+                $search = $request->search;
+                $query->searchByEncryptedFields($search);
+            }
+
+            if ($request->has('role')) {
+                $query->where('role', $request->role);
+            }
+
+            if ($request->has('status')) {
+                $query->where('is_active', $request->status === 'active');
+            }
+
+            if ($request->has('state')) {
+                $query->where(function($q) use ($request) {
+                    $q->where('state', $request->state);
+                });
+            }
+
+            $users = $query->paginate($request->get('per_page', 15));
+
+            return response()->json([
+                'message' => 'Users retrieved successfully',
+                'data' => $users
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Error retrieving users',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get user details
+     */
+    public function user(User $user): JsonResponse
+    {
+        try {
+            $user->load(['loyaltyCards', 'stores', 'purchases', 'notifications']);
+
+            return response()->json([
+                'message' => 'User details retrieved successfully',
+                'data' => $user
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Error retrieving user details',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Update user status
+     */
+    public function updateUserStatus(Request $request, $user): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'is_active' => 'required|boolean',
+            'reason' => 'nullable|string|max:500'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            // Resolve ID from route param to avoid any route-model binding issues
+            $userId = is_numeric($user) ? (int) $user : (int) $request->route('user');
+            if ($userId <= 0) {
+                return response()->json([
+                    'message' => 'Invalid user id',
+                    'updated' => false,
+                    'id' => null,
+                    'db_connection' => config('database.default'),
+                    'db_database' => (string) DB::connection()->getDatabaseName(),
+                ], 400);
+            }
+
+            // Find the user directly
+            $userModel = User::find($userId);
+            if (!$userModel) {
+                return response()->json([
+                    'message' => 'User not found',
+                    'updated' => false,
+                    'id' => $userId,
+                    'db_connection' => config('database.default'),
+                    'db_database' => (string) DB::connection()->getDatabaseName(),
+                ], 404);
+            }
+
+            $userModel->update([
+                'is_active' => $request->is_active
+            ]);
+
+            // Send notification to user
+            if ($request->has('reason')) {
+                Notification::create([
+                    'user_id' => $userModel->id,
+                    'title' => $request->is_active ? 'Account Activated' : 'Account Suspended',
+                    'message' => $request->reason,
+                    // Use valid enum value for type and encode severity via priority
+                    'type' => 'system',
+                    'priority' => $request->is_active ? 'normal' : 'high',
+                    'is_read' => false
+                ]);
+            }
+
+            return response()->json([
+                'message' => 'User status updated successfully',
+                'data' => $userModel,
+                'updated' => true,
+                'id' => $userId,
+                'db_connection' => config('database.default'),
+                'db_database' => (string) DB::connection()->getDatabaseName(),
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Error updating user status',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Update user profile fields (admin only subset)
+     */
+    public function updateUserProfile(Request $request, $user): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'state' => 'sometimes|string|max:100',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            $userId = is_numeric($user) ? (int) $user : (int) $request->route('user');
+            if ($userId <= 0) {
+                return response()->json([
+                    'message' => 'Invalid user id',
+                    'updated' => false,
+                    'id' => null,
+                    'db_connection' => config('database.default'),
+                    'db_database' => (string) DB::connection()->getDatabaseName(),
+                ], 400);
+            }
+
+            $userModel = User::find($userId);
+            if (!$userModel) {
+                return response()->json([
+                    'message' => 'User not found',
+                    'updated' => false,
+                    'id' => $userId,
+                    'db_connection' => config('database.default'),
+                    'db_database' => (string) DB::connection()->getDatabaseName(),
+                ], 404);
+            }
+
+            $payload = [];
+            if ($request->has('state')) {
+                $payload['state'] = $request->state;
+            }
+
+
+            if (!empty($payload)) {
+                $userModel->update($payload);
+            }
+
+            return response()->json([
+                'message' => 'User profile updated successfully',
+                'data' => $userModel,
+                'updated' => true,
+                'id' => $userId,
+                'db_connection' => config('database.default'),
+                'db_database' => (string) DB::connection()->getDatabaseName(),
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Error updating user profile',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get all stores with pagination and filters
+     */
+    public function stores(Request $request): JsonResponse
+    {
+        try {
+            $query = Store::with(['owner']);
+            $currentUser = auth()->user();
+
+            // Apply role-based filtering
+            if ($currentUser->isAdmin() && !$currentUser->isGlobalAdmin()) {
+                // Local admin can only see stores whose owner is in their state
+                $query->whereHas('owner', function($q) use ($currentUser) {
+                    $q->where('state', $currentUser->state);
+                });
+            }
+            // Global admin can see all stores
+
+            // Apply filters
+            if ($request->has('search')) {
+                $search = $request->search;
+                $query->searchByEncryptedFields($search);
+            }
+
+            if ($request->has('status')) {
+                $query->where('is_approved', $request->status === 'approved');
+            }
+
+            if ($request->has('category')) {
+                $query->where('business_type', $request->category);
+            }
+
+            if ($request->has('state')) {
+                $query->where('state', $request->state);
+            }
+
+            $stores = $query->paginate($request->get('per_page', 15));
+
+            return response()->json([
+                'message' => 'Stores retrieved successfully',
+                'data' => $stores
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Error retrieving stores',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Approve or reject store
+     */
+    public function updateStoreStatus(Request $request, $store): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'is_approved' => 'required|boolean',
+            'reason' => 'nullable|string|max:500'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            // Resolve ID from route param to avoid any route-model binding issues
+            $storeId = is_numeric($store) ? (int) $store : (int) $request->route('store');
+            if ($storeId <= 0) {
+                return response()->json([
+                    'message' => 'Invalid store id',
+                    'updated' => false,
+                    'id' => null,
+                    'db_connection' => config('database.default'),
+                    'db_database' => (string) DB::connection()->getDatabaseName(),
+                ], 400);
+            }
+
+            // Find the store directly
+            $storeModel = Store::find($storeId);
+            if (!$storeModel) {
+                return response()->json([
+                    'message' => 'Store not found',
+                    'updated' => false,
+                    'id' => $storeId,
+                    'db_connection' => config('database.default'),
+                    'db_database' => (string) DB::connection()->getDatabaseName(),
+                ], 404);
+            }
+
+            $storeModel->update([
+                'is_approved' => $request->is_approved,
+                'approved_at' => $request->is_approved ? now() : null
+            ]);
+
+            // Send notification to store owner
+            if ($request->has('reason')) {
+                Notification::create([
+                    // stores table references owner via user_id
+                    'user_id' => $storeModel->user_id,
+                    'title' => $request->is_approved ? 'Store Approved' : 'Store Rejected',
+                    'message' => $request->reason,
+                    'type' => 'system',
+                    'priority' => $request->is_approved ? 'normal' : 'high',
+                    'is_read' => false
+                ]);
+            }
+
+            return response()->json([
+                'message' => 'Store status updated successfully',
+                'data' => $storeModel,
+                'updated' => true,
+                'id' => $storeId,
+                'db_connection' => config('database.default'),
+                'db_database' => (string) DB::connection()->getDatabaseName(),
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Error updating store status',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Create new store
+     */
+    public function createStore(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'store_name' => 'required|string|max:255',
+            'description' => 'required|string|max:1000',
+            'business_type' => 'required|string|max:100',
+            'phone' => 'required|string|max:20',
+            'email' => 'required|email|max:255',
+            'website' => 'nullable|url|max:255',
+            'address' => 'required|string|max:500',
+            'city' => 'required|string|max:100',
+            'state' => 'required|string|max:100',
+            'postal_code' => 'nullable|string|max:20',
+            'country' => 'nullable|string|max:100',
+            'latitude' => 'nullable|numeric',
+            'longitude' => 'nullable|numeric',
+            'logo_url' => 'nullable|string',
+            'banner_url' => 'nullable|string',
+            'business_hours' => 'nullable|array',
+            'payment_methods' => 'nullable|array',
+            'services' => 'nullable|array',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            // Build payload and normalize to match DB schema requirements
+            $payload = [
+                'user_id' => auth()->id(),
+                'store_name' => $request->store_name,
+                'description' => $request->description,
+                'business_type' => $request->business_type,
+                'phone' => $request->phone,
+                'email' => $request->email,
+                'website' => $request->website,
+                'address' => $request->address,
+                'city' => $request->city,
+                'state' => $request->state,
+                // DB columns are NOT NULL for postal_code and country; default to empty string if omitted
+                'postal_code' => $request->postal_code ?? '',
+                'country' => $request->country ?? '',
+                'latitude' => $request->latitude,
+                'longitude' => $request->longitude,
+                // Map UI fields to DB columns
+                'logo' => $request->logo_url,
+                'banner' => $request->banner_url,
+                // Default required JSON fields to empty arrays if not provided
+                'business_hours' => $request->get('business_hours', []),
+                'payment_methods' => $request->get('payment_methods', []),
+                'services' => $request->get('services', []),
+                'is_approved' => true, // Admin-created stores are auto-approved
+                'is_active' => true,
+                'approved_at' => now(),
+                'approved_by' => auth()->id(),
+            ];
+
+            $store = Store::create($payload);
+
+            return response()->json([
+                'message' => 'Store created successfully',
+                'data' => $store
+            ], 201);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Error creating store',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Update store
+     */
+    public function updateStore(Request $request, $store): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'store_name' => 'required|string|max:255',
+            'description' => 'required|string|max:1000',
+            'business_type' => 'required|string|max:100',
+            'phone' => 'required|string|max:20',
+            'email' => 'required|email|max:255',
+            'website' => 'nullable|url|max:255',
+            'address' => 'required|string|max:500',
+            'city' => 'required|string|max:100',
+            'state' => 'required|string|max:100',
+            'postal_code' => 'nullable|string|max:20',
+            'country' => 'nullable|string|max:100',
+            'latitude' => 'nullable|numeric',
+            'longitude' => 'nullable|numeric',
+            'logo_url' => 'nullable|string',
+            'banner_url' => 'nullable|string',
+            'business_hours' => 'nullable|array',
+            'payment_methods' => 'nullable|array',
+            'services' => 'nullable|array',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            // Resolve ID from route param to avoid any route-model binding issues
+            $storeId = is_numeric($store) ? (int) $store : (int) $request->route('store');
+            if ($storeId <= 0) {
+                return response()->json([
+                    'message' => 'Invalid store id',
+                    'updated' => false,
+                    'id' => null,
+                    'db_connection' => config('database.default'),
+                    'db_database' => (string) DB::connection()->getDatabaseName(),
+                ], 400);
+            }
+
+            // Find the store directly
+            $storeModel = Store::find($storeId);
+            if (!$storeModel) {
+                return response()->json([
+                    'message' => 'Store not found',
+                    'updated' => false,
+                    'id' => $storeId,
+                    'db_connection' => config('database.default'),
+                    'db_database' => (string) DB::connection()->getDatabaseName(),
+                ], 404);
+            }
+
+            // Build update payload; avoid setting NOT NULL columns to null
+            $payload = [
+                'store_name' => $request->store_name,
+                'description' => $request->description,
+                'business_type' => $request->business_type,
+                'phone' => $request->phone,
+                'email' => $request->email,
+                'website' => $request->website,
+                'address' => $request->address,
+                'city' => $request->city,
+                'state' => $request->state,
+                'latitude' => $request->latitude,
+                'longitude' => $request->longitude,
+            ];
+
+            // Only include NOT NULL columns if a non-null value is provided
+            if ($request->has('postal_code') && $request->postal_code !== null) {
+                $payload['postal_code'] = $request->postal_code;
+            }
+            if ($request->has('country') && $request->country !== null) {
+                $payload['country'] = $request->country;
+            }
+
+            // Map UI image fields if present
+            if ($request->has('logo_url')) {
+                $payload['logo'] = $request->logo_url;
+            }
+            if ($request->has('banner_url')) {
+                $payload['banner'] = $request->banner_url;
+            }
+
+            // Optional JSON fields
+            if ($request->has('business_hours')) {
+                $payload['business_hours'] = $request->business_hours ?? [];
+            }
+            if ($request->has('payment_methods')) {
+                $payload['payment_methods'] = $request->payment_methods ?? [];
+            }
+            if ($request->has('services')) {
+                $payload['services'] = $request->services ?? [];
+            }
+
+            $storeModel->update($payload);
+
+            return response()->json([
+                'message' => 'Store updated successfully',
+                'data' => $storeModel,
+                'updated' => true,
+                'id' => $storeId,
+                'db_connection' => config('database.default'),
+                'db_database' => (string) DB::connection()->getDatabaseName(),
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Error updating store',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete store
+     */
+    public function deleteStore(Request $request, $store): JsonResponse
+    {
+        try {
+            // Resolve ID from route param to avoid any route-model binding issues
+            $storeId = is_numeric($store) ? (int) $store : (int) $request->route('store');
+            if ($storeId <= 0) {
+                return response()->json([
+                    'message' => 'Invalid store id',
+                    'deleted' => 0,
+                    'id' => null,
+                    'db_connection' => config('database.default'),
+                    'db_database' => (string) DB::connection()->getDatabaseName(),
+                ], 400);
+            }
+
+            // Perform a direct delete and return affected rows for robustness
+            $deletedRows = Store::where('id', $storeId)->delete();
+
+            return response()->json([
+                'message' => $deletedRows === 1 ? 'Store deleted successfully' : 'Store not found or already deleted',
+                'deleted' => (int) $deletedRows,
+                'id' => $storeId,
+                'db_connection' => config('database.default'),
+                'db_database' => (string) DB::connection()->getDatabaseName(),
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Error deleting store',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Toggle store approval status
+     */
+    public function toggleStoreApproval(Request $request, $store): JsonResponse
+    {
+        try {
+            // Resolve ID from route param to avoid any route-model binding issues
+            $storeId = is_numeric($store) ? (int) $store : (int) $request->route('store');
+            if ($storeId <= 0) {
+                return response()->json([
+                    'message' => 'Invalid store id',
+                    'updated' => false,
+                    'id' => null,
+                    'db_connection' => config('database.default'),
+                    'db_database' => (string) DB::connection()->getDatabaseName(),
+                ], 400);
+            }
+
+            // Find the store directly
+            $storeModel = Store::find($storeId);
+            if (!$storeModel) {
+                return response()->json([
+                    'message' => 'Store not found',
+                    'updated' => false,
+                    'id' => $storeId,
+                    'db_connection' => config('database.default'),
+                    'db_database' => (string) DB::connection()->getDatabaseName(),
+                ], 404);
+            }
+
+            $storeModel->update([
+                'is_approved' => !$storeModel->is_approved,
+                'approved_at' => !$storeModel->is_approved ? now() : null,
+                'approved_by' => !$storeModel->is_approved ? auth()->id() : null,
+            ]);
+
+            return response()->json([
+                'message' => $storeModel->is_approved ? 'Store approved successfully' : 'Store disapproved successfully',
+                'data' => $storeModel,
+                'updated' => true,
+                'id' => $storeId,
+                'db_connection' => config('database.default'),
+                'db_database' => (string) DB::connection()->getDatabaseName(),
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Error toggling store approval',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get all offers with pagination and filters
+     */
+    public function offers(Request $request): JsonResponse
+    {
+        try {
+            $query = Offer::with(['store', 'store.owner']);
+
+            $currentUser = auth()->user();
+            // Local admin: restrict offers to stores whose owner is in same state
+            if ($currentUser->isAdmin() && !$currentUser->isGlobalAdmin()) {
+                $query->whereHas('store.owner', function($q) use ($currentUser) {
+                    $q->where('state', $currentUser->state);
+                    
+                });
+            }
+
+            // Apply filters
+            if ($request->has('search')) {
+                $search = $request->search;
+                $query->where(function($q) use ($search) {
+                    $q->where('title', 'like', "%{$search}%")
+                      ->orWhere('description', 'like', "%{$search}%");
+                });
+            }
+
+            if ($request->has('status')) {
+                $query->where('is_active', $request->status === 'active');
+            }
+
+            if ($request->has('store_id')) {
+                $query->where('store_id', $request->store_id);
+            }
+
+            $offers = $query->paginate($request->get('per_page', 15));
+
+            // Ensure blob fields are not included in the response
+            $offers->getCollection()->transform(function ($offer) {
+                $offer->makeHidden(['image_blob']);
+                if ($offer->store) {
+                    $offer->store->makeHidden(['logo_blob', 'banner_blob']);
+                }
+                return $offer;
+            });
+
+            return response()->json([
+                'message' => 'Offers retrieved successfully',
+                'data' => $offers
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Error retrieving offers',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Create new offer
+     */
+    public function createOffer(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'store_id' => 'required|exists:stores,id',
+            'title' => 'required|string|max:255',
+            'description' => 'required|string|max:1000',
+            // Accept both fixed and fixed_amount for compatibility with DB enum
+            'discount_type' => 'required|in:percentage,fixed,fixed_amount',
+            'discount_value' => 'required|numeric|min:0',
+            'min_purchase' => 'nullable|numeric|min:0',
+            'max_discount' => 'nullable|numeric|min:0',
+            'valid_from' => 'required|date',
+            'valid_until' => 'required|date|after:valid_from',
+            'is_active' => 'boolean'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            $payload = $request->all();
+            // Normalize fields to match DB schema
+            if (isset($payload['discount_type']) && $payload['discount_type'] === 'fixed') {
+                $payload['discount_type'] = 'fixed_amount';
+            }
+            if (isset($payload['min_purchase'])) {
+                $payload['minimum_purchase'] = $payload['min_purchase'];
+                unset($payload['min_purchase']);
+            }
+            // Ignore unknown keys that are not fillable
+            $offer = Offer::create($payload);
+
+            return response()->json([
+                'message' => 'Offer created successfully',
+                'data' => $offer
+            ], 201);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Error creating offer',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Update offer
+     */
+    public function updateOffer(Request $request, $offer): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'title' => 'string|max:255',
+            'description' => 'string|max:1000',
+            // Accept both fixed and fixed_amount for compatibility with DB enum
+            'discount_type' => 'in:percentage,fixed,fixed_amount',
+            'discount_value' => 'numeric|min:0',
+            'min_purchase' => 'nullable|numeric|min:0',
+            'max_discount' => 'nullable|numeric|min:0',
+            'valid_from' => 'date',
+            'valid_until' => 'date|after:valid_from',
+            'is_active' => 'boolean'
+            
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            // Resolve ID from route param to avoid any route-model binding issues
+            $offerId = is_numeric($offer) ? (int) $offer : (int) $request->route('offer');
+            if ($offerId <= 0) {
+                return response()->json([
+                    'message' => 'Invalid offer id',
+                    'updated' => false,
+                    'id' => null,
+                    'db_connection' => config('database.default'),
+                    'db_database' => (string) DB::connection()->getDatabaseName(),
+                ], 400);
+            }
+
+            // Find the offer directly
+            $offerModel = Offer::find($offerId);
+            if (!$offerModel) {
+                return response()->json([
+                    'message' => 'Offer not found',
+                    'updated' => false,
+                    'id' => $offerId,
+                    'db_connection' => config('database.default'),
+                    'db_database' => (string) DB::connection()->getDatabaseName(),
+                ], 404);
+            }
+
+            $payload = $request->all();
+            if (isset($payload['discount_type']) && $payload['discount_type'] === 'fixed') {
+                $payload['discount_type'] = 'fixed_amount';
+            }
+            if (isset($payload['min_purchase'])) {
+                $payload['minimum_purchase'] = $payload['min_purchase'];
+                unset($payload['min_purchase']);
+            }
+            $offerModel->update($payload);
+
+            return response()->json([
+                'message' => 'Offer updated successfully',
+                'data' => $offerModel,
+                'updated' => true,
+                'id' => $offerId,
+                'db_connection' => config('database.default'),
+                'db_database' => (string) DB::connection()->getDatabaseName(),
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Error updating offer',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete offer
+     */
+    public function deleteOffer(Request $request, $offer): JsonResponse
+    {
+        try {
+            // Resolve ID from route param to avoid any route-model binding issues
+            $offerId = is_numeric($offer) ? (int) $offer : (int) $request->route('offer');
+            if ($offerId <= 0) {
+                return response()->json([
+                    'message' => 'Invalid offer id',
+                    'deleted' => 0,
+                    'id' => null,
+                    'db_connection' => config('database.default'),
+                    'db_database' => (string) DB::connection()->getDatabaseName(),
+                ], 400);
+            }
+
+            // Perform a direct delete and return affected rows for robustness
+            $deletedRows = Offer::where('id', $offerId)->delete();
+
+            return response()->json([
+                'message' => $deletedRows === 1 ? 'Offer deleted successfully' : 'Offer not found or already deleted',
+                'deleted' => (int) $deletedRows,
+                'id' => $offerId,
+                'db_connection' => config('database.default'),
+                'db_database' => (string) DB::connection()->getDatabaseName(),
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Error deleting offer',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get analytics data
+     */
+    public function analytics(Request $request): JsonResponse
+    {
+        try {
+            $period = $request->get('period', 'month'); // day, week, month, year
+            
+            $analytics = [
+                'user_growth' => $this->getUserGrowth($period),
+                'revenue_trends' => $this->getRevenueTrends($period),
+                'top_stores' => $this->getTopStores($period),
+                'popular_offers' => $this->getPopularOffers($period),
+                'geographic_distribution' => $this->getGeographicDistribution(),
+            ];
+
+            return response()->json([
+                'message' => 'Analytics data retrieved successfully',
+                'data' => $analytics
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Error retrieving analytics',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get user growth data
+     */
+    private function getUserGrowth(string $period): array
+    {
+        $query = User::selectRaw('DATE(created_at) as date, COUNT(*) as count')
+            ->groupBy('date')
+            ->orderBy('date');
+
+        switch ($period) {
+            case 'week':
+                $query->where('created_at', '>=', now()->subWeek());
+                break;
+            case 'month':
+                $query->where('created_at', '>=', now()->subMonth());
+                break;
+            case 'year':
+                $query->where('created_at', '>=', now()->subYear());
+                break;
+            default:
+                $query->where('created_at', '>=', now()->subMonth());
+        }
+
+        return $query->get()->toArray();
+    }
+
+    /**
+     * Get revenue trends
+     */
+    private function getRevenueTrends(string $period): array
+    {
+        $query = Purchase::selectRaw('DATE(purchase_date) as date, SUM(final_amount) as revenue')
+            ->groupBy('date')
+            ->orderBy('date');
+
+        switch ($period) {
+            case 'week':
+                $query->where('purchase_date', '>=', now()->subWeek());
+                break;
+            case 'month':
+                $query->where('purchase_date', '>=', now()->subMonth());
+                break;
+            case 'year':
+                $query->where('purchase_date', '>=', now()->subYear());
+                break;
+            default:
+                $query->where('purchase_date', '>=', now()->subMonth());
+        }
+
+        return $query->get()->toArray();
+    }
+
+    /**
+     * Get top performing stores
+     */
+    private function getTopStores(string $period): array
+    {
+        $query = Store::selectRaw('stores.store_name, COUNT(purchases.id) as purchase_count, SUM(purchases.final_amount) as revenue')
+            ->leftJoin('purchases', 'stores.id', '=', 'purchases.store_id')
+            ->groupBy('stores.id', 'stores.store_name')
+            ->orderBy('revenue', 'desc')
+            ->limit(10);
+
+        switch ($period) {
+            case 'week':
+                $query->where('purchases.purchase_date', '>=', now()->subWeek());
+                break;
+            case 'month':
+                $query->where('purchases.purchase_date', '>=', now()->subMonth());
+                break;
+            case 'year':
+                $query->where('purchases.purchase_date', '>=', now()->subYear());
+                break;
+            default:
+                $query->where('purchases.purchase_date', '>=', now()->subMonth());
+        }
+
+        return $query->get()->toArray();
+    }
+
+    /**
+     * Get popular offers
+     */
+    private function getPopularOffers(string $period): array
+    {
+        $query = Offer::selectRaw('offers.title, COUNT(purchases.id) as redemption_count')
+            ->leftJoin('purchases', 'offers.id', '=', 'purchases.offer_id')
+            ->groupBy('offers.id', 'offers.title')
+            ->orderBy('redemption_count', 'desc')
+            ->limit(10);
+
+        switch ($period) {
+            case 'week':
+                $query->where('purchases.purchase_date', '>=', now()->subWeek());
+                break;
+            case 'month':
+                $query->where('purchases.purchase_date', '>=', now()->subMonth());
+                break;
+            case 'year':
+                $query->where('purchases.purchase_date', '>=', now()->subYear());
+                break;
+            default:
+                $query->where('purchases.purchase_date', '>=', now()->subMonth());
+        }
+
+        return $query->get()->toArray();
+    }
+
+    /**
+     * Get geographic distribution
+     */
+    private function getGeographicDistribution(): array
+    {
+        return Store::selectRaw('city, COUNT(*) as store_count')
+            ->groupBy('city')
+            ->orderBy('store_count', 'desc')
+            ->limit(10)
+            ->get()
+            ->toArray();
+    }
+}

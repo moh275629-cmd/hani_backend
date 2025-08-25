@@ -1,0 +1,225 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\LoyaltyCard;
+use App\Models\Purchase;
+use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Validator;
+
+class LoyaltyCardController extends Controller
+{
+    /**
+     * Check if the authenticated user is a client
+     */
+    private function ensureClientUser()
+    {
+        if (auth()->user()->role !== 'client') {
+            abort(403, 'Access denied. Only client users can access loyalty cards.');
+        }
+    }
+
+    /**
+     * Display the user's loyalty card
+     */
+    public function show(): JsonResponse
+    {
+        $this->ensureClientUser();
+        $user = Auth::user();
+        $loyaltyCard = LoyaltyCard::where('user_id', $user->id)->first();
+
+        if (!$loyaltyCard) {
+            // Auto-create a loyalty card for the user if it does not exist
+            $cardNumber = $this->generateCardNumber();
+            $loyaltyCard = LoyaltyCard::create([
+                'user_id' => $user->id,
+                'card_number' => $cardNumber,
+                'qr_code' => $this->generateQRCode($user->id, $cardNumber, null),
+                'card_type' => 'standard',
+                'status' => 'active',
+                'issue_date' => now()->toDateString(),
+                'expiry_date' => now()->addYears(2)->toDateString(),
+                'is_active' => true,
+            ]);
+        } else {
+            // Check if existing QR code is properly formatted
+            $qrData = json_decode($loyaltyCard->qr_code, true);
+            if (!$qrData || !isset($qrData['user_id']) || !isset($qrData['card_number']) || !isset($qrData['timestamp'])) {
+                // Regenerate QR code if it's not properly formatted
+                $loyaltyCard->update([
+                    'qr_code' => $this->generateQRCode($user->id, $loyaltyCard->card_number, $loyaltyCard->store_id)
+                ]);
+                $loyaltyCard->refresh();
+            }
+        }
+
+        return response()->json([
+            'message' => 'Loyalty card retrieved successfully',
+            'data' => $loyaltyCard
+        ]);
+    }
+
+    /**
+     * Activate a new loyalty card for the user
+     */
+    public function activate(Request $request): JsonResponse
+    {
+        $this->ensureClientUser();
+        $user = Auth::user();
+        
+        // Check if user already has a loyalty card
+        $existingCard = LoyaltyCard::where('user_id', $user->id)->first();
+        if ($existingCard) {
+            return response()->json([
+                'message' => 'User already has an active loyalty card',
+                'data' => $existingCard
+            ], 400);
+        }
+
+        // Generate unique card number
+        $cardNumber = $this->generateCardNumber();
+        
+        // Create new loyalty card
+        $loyaltyCard = LoyaltyCard::create([
+            'user_id' => $user->id,
+            'store_id' => null, // Global loyalty card
+            'card_number' => $cardNumber,
+            'qr_code' => $this->generateQRCode($user->id, $cardNumber, null),
+            'points_balance' => 0,
+            'total_points_earned' => 0,
+            'total_points_spent' => 0,
+            'card_type' => 'standard',
+            'status' => 'active',
+            'issue_date' => now()->toDateString(),
+            'expiry_date' => now()->addYears(2)->toDateString(),
+            'is_active' => true,
+        ]);
+
+        return response()->json([
+            'message' => 'Loyalty card activated successfully',
+            'data' => $loyaltyCard
+        ], 201);
+    }
+
+    /**
+     * Get loyalty card transaction history
+     */
+    public function transactions(Request $request): JsonResponse
+    {
+        $this->ensureClientUser();
+        $user = Auth::user();
+        $loyaltyCard = LoyaltyCard::where('user_id', $user->id)->first();
+
+        if (!$loyaltyCard) {
+            return response()->json([
+                'message' => 'No loyalty card found',
+                'data' => []
+            ], 404);
+        }
+
+        $transactions = Purchase::where('user_id', $user->id)
+            ->with(['branch', 'offer'])
+            ->orderBy('created_at', 'desc')
+            ->paginate(20);
+
+        return response()->json([
+            'message' => 'Transactions retrieved successfully',
+            'data' => $transactions
+        ]);
+    }
+
+    /**
+     * Generate a unique loyalty card number
+     */
+    private function generateCardNumber(): string
+    {
+        do {
+            $cardNumber = 'HANI' . str_pad(rand(0, 999999), 6, '0', STR_PAD_LEFT);
+        } while (LoyaltyCard::where('card_number', $cardNumber)->exists());
+
+        return $cardNumber;
+    }
+
+    /**
+     * Generate QR code with proper data structure
+     */
+    private function generateQRCode(int $userId, string $cardNumber, $storeId = null): string
+    {
+        return LoyaltyCard::generateQrCode($userId, $cardNumber, $storeId);
+    }
+
+    /**
+     * Regenerate QR code for existing loyalty card
+     */
+    public function regenerateQRCode(): JsonResponse
+    {
+        $this->ensureClientUser();
+        $user = Auth::user();
+        $loyaltyCard = LoyaltyCard::where('user_id', $user->id)->first();
+
+        if (!$loyaltyCard) {
+            return response()->json([
+                'message' => 'No loyalty card found',
+                'data' => null
+            ], 404);
+        }
+
+        // Generate new QR code with proper data
+        $newQrCode = $this->generateQRCode($user->id, $loyaltyCard->card_number, $loyaltyCard->store_id);
+        
+        $loyaltyCard->update([
+            'qr_code' => $newQrCode
+        ]);
+
+        return response()->json([
+            'message' => 'QR code regenerated successfully',
+            'data' => [
+                'qr_code' => $newQrCode,
+                'card_number' => $loyaltyCard->card_number,
+                'user_id' => $user->id
+            ]
+        ]);
+    }
+
+
+    /**
+     * Add points to loyalty card
+     */
+    public function addPoints(int $points, float $amount): void
+    {
+        $this->ensureClientUser();
+        $user = Auth::user();
+        $loyaltyCard = LoyaltyCard::where('user_id', $user->id)->first();
+
+        if ($loyaltyCard) {
+            $loyaltyCard->update([
+                'points_balance' => $loyaltyCard->points_balance + $points,
+                'total_points_earned' => $loyaltyCard->total_points_earned + $points,
+                'last_used_at' => now(),
+            ]);
+        }
+    }
+
+    /**
+     * Deduct points from loyalty card
+     */
+    public function deductPoints(int $points): bool
+    {
+        $this->ensureClientUser();
+        $user = Auth::user();
+        $loyaltyCard = LoyaltyCard::where('user_id', $user->id)->first();
+
+        if ($loyaltyCard && $loyaltyCard->points_balance >= $points) {
+            $loyaltyCard->update([
+                'points_balance' => $loyaltyCard->points_balance - $points,
+                'total_points_spent' => $loyaltyCard->total_points_spent + $points,
+                'last_used_at' => now(),
+            ]);
+            return true;
+        }
+
+        return false;
+    }
+}
