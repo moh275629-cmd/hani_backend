@@ -276,117 +276,126 @@ class AuthController extends Controller
      */
     public function verifyOtp(Request $request)
     {
-        $validator = Validator::make($request->all(), [
-            'identifier' => 'required|string', // email or phone
-            'otp' => 'required|string|size:6',
-            'type' => 'required|string',
-        ]);
+        try {
+            $validator = Validator::make($request->all(), [
+                'identifier' => 'required|string', // email or phone
+                'otp' => 'required|string|size:6',
+                'type' => 'required|string',
+            ]);
 
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $validator->errors()
-            ], 422);
-        }
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
 
-        // Accept any valid, unused OTP matching the provided code for this identifier/type
-        $otp = Otp::forIdentifier($request->identifier)
-            ->ofType($request->type)->where('otp', $request->otp);
-        
-        if (!$otp || $otp->otp !== $request->otp || 
-            $otp->type !== $request->type || 
-            $otp->isExpired() || 
-            $otp->is_used) {
-            $otp = null; // Reset to null if any condition fails
-        }
+            // Accept any valid, unused OTP matching the provided code for this identifier/type
+            $otp = Otp::forIdentifier($request->identifier)
+                ->ofType($request->type)->where('otp', $request->otp);
+            
+            if (!$otp || $otp->otp !== $request->otp || 
+                $otp->type !== $request->type || 
+                $otp->isExpired() || 
+                $otp->is_used) {
+                $otp = null; // Reset to null if any condition fails
+            }
 
-        if (!$otp) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Invalid or expired OTP'
-            ], 400);
-        }
+            if (!$otp) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid or expired OTP'
+                ], 400);
+            }
 
-        // Mark OTP as used
-        $otp->update([
-            'is_used' => true,
-            'used_at' => now(),
-        ]);
+            // Mark OTP as used
+            $otp->update([
+                'is_used' => true,
+                'used_at' => now(),
+            ]);
 
-        // Update user verification status (handle encrypted fields via findByEmail/findByPhone)
-        if ($request->type === 'email') {
-            $user = User::findByEmail($request->identifier);
-        } elseif ($request->type === 'phone') {
-            $user = User::findByPhone($request->identifier);
-        } else {
-            $user = null;
-        }
-        $store = null;
-        if ($user) {
+            // Update user verification status (handle encrypted fields via findByEmail/findByPhone)
             if ($request->type === 'email') {
-                $user->markEmailAsVerified();
-                $user->is_active = true;
-                $user->save();
+                $user = User::findByEmail($request->identifier);
+            } elseif ($request->type === 'phone') {
+                $user = User::findByPhone($request->identifier);
             } else {
-                $user->markPhoneAsVerified();
-                $user->is_active = true;
-                $user->save();
+                $user = null;
             }
-            
-            // For store users, activate them after OTP verification
-            if ($user->role === 'store') {
-                $user->is_active = true;
-                $user->save();
-                // Fetch the related store and send the store registration email
-                $store = \App\Models\Store::where('user_id', $user->id)->first();
-                if ($store) {
-                    $this->_sendStoreRegistrationEmail($user, $store);
+            $store = null;
+            if ($user) {
+                if ($request->type === 'email') {
+                    $user->markEmailAsVerified();
+                    $user->is_active = true;
+                    $user->save();
+                } else {
+                    $user->markPhoneAsVerified();
+                    $user->is_active = true;
+                    $user->save();
                 }
-                // Ensure store is correctly loaded
-                if (!$store) {
-                    // Auto-create a minimal store record so store endpoints work
-                    try {
-                        $store = \App\Models\Store::create([
-                            'user_id' => $user->id,
-                            'name' => $user->name ?? 'My Store',
-                            'state' => $user->state ?? null,
-                            'is_active' => true,
-                            'is_approved' => false,
-                        ]);
-                    } catch (\Exception $e) {
-                        \Log::error('Failed to auto-create store on OTP verify: ' . $e->getMessage());
+                
+                // For store users, activate them after OTP verification
+                if ($user->role === 'store') {
+                    $user->is_active = true;
+                    $user->save();
+                    // Fetch the related store and send the store registration email
+                    $store = \App\Models\Store::where('user_id', $user->id)->first();
+                    if ($store) {
+                        $this->_sendStoreRegistrationEmail($user, $store);
                     }
+                    // Ensure store is correctly loaded
+                    if (!$store) {
+                        // Auto-create a minimal store record so store endpoints work
+                        try {
+                            $store = \App\Models\Store::create([
+                                'user_id' => $user->id,
+                                'store_name' => $user->name ?? 'My Store',
+                                'state' => $user->state ?? null,
+                                'is_active' => true,
+                                'is_approved' => false,
+                            ]);
+                        } catch (\Exception $e) {
+                            \Log::error('Failed to auto-create store on OTP verify: ' . $e->getMessage());
+                        }
+                    }
+                    // Reload store
+                    $store = $store ?: \App\Models\Store::where('user_id', $user->id)->first();
                 }
-                // Reload store
-                $store = $store ?: \App\Models\Store::where('user_id', $user->id)->first();
+                
+                // Create authentication token
+                $token = $user->createToken('auth-token')->plainTextToken;
+                
+                return response()->json([
+                    'success' => true,
+                    'message' => 'OTP verified successfully',
+                    'user' => [
+                        'id' => $user->id,
+                        'name' => $user->name,
+                        'email' => $user->email,
+                        'phone' => $user->phone,
+                        'role' => $user->role,
+                        'state' => $user->state,
+                        'is_active' => $user->is_active,
+                    ],
+                    'store' => $store,
+                    'token' => $token,
+                ]);
             }
-            
-            // Create authentication token
-            $token = $user->createToken('auth-token')->plainTextToken;
-            
+
             return response()->json([
                 'success' => true,
-                'message' => 'OTP verified successfully',
-                'user' => [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                    'phone' => $user->phone,
-                    'role' => $user->role,
-                    'state' => $user->state,
-                    'is_active' => $user->is_active,
-                ],
-                'store' => $store,
-                'token' => $token,
+                'message' => 'OTP verified successfully'
             ]);
+            $otp->delete();
+        } catch (\Exception $e) {
+            \Log::error('OTP verification error: ' . $e->getMessage());
+            \Log::error('Stack trace: ' . $e->getTraceAsString());
+            return response()->json([
+                'success' => false,
+                'message' => 'Server Error: ' . $e->getMessage()
+            ], 500);
         }
-
-        return response()->json([
-            'success' => true,
-            'message' => 'OTP verified successfully'
-        ]);
-        $otp->delete();
     }
 
     /**
