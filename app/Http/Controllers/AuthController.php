@@ -407,65 +407,43 @@ class AuthController extends Controller
      */
     public function profile(Request $request)
     {
-        $user = $request->user();
-        $loyaltyCard = null;
-        
-        // Only create loyalty cards for cvriflient users
-        if ($user->role === 'client') {
-            $loyaltyCard = \App\Models\LoyaltyCard::where('user_id', $user->id)->first();
-            if (!$loyaltyCard) {
-                $cardNumber = \App\Models\LoyaltyCard::generateCardNumber();
-                $loyaltyCard = \App\Models\LoyaltyCard::create([
-                    'user_id' => $user->id,
-                    'card_number' => $cardNumber,
-                    'qr_code' => \App\Models\LoyaltyCard::generateQrCode($user->id, $cardNumber, null),
-                    'card_type' => 'standard',
-                    'status' => 'active',
-                    'issue_date' => now()->toDateString(),
-                    'expiry_date' => now()->addYears(2)->toDateString(),
-                    'is_active' => true,
-                ]);
-            }
+        try {
+            \Log::info('Profile endpoint called for user: ' . $request->user()->id);
+            
+            $user = $request->user();
+            
+            \Log::info('User retrieved successfully: ' . $user->email);
+            
+            // Simple test response first
+            $response = [
+                'success' => true,
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'phone' => $user->phone,
+                    'role' => $user->role,
+                    'state' => $user->state,
+                    'is_active' => $user->is_active,
+                ],
+                'loyalty_card' => null,
+                'id_verification' => [
+                    'is_verified' => !is_null($user->id_verified_at),
+                    'verified_at' => $user->id_verified_at,
+                    'extracted_data' => $user->id_verification_data,
+                ],
+            ];
+            
+            \Log::info('Profile response ready, returning JSON');
+            return response()->json($response);
+            
+        } catch (\Exception $e) {
+            \Log::error('Profile endpoint error: ' . $e->getMessage());
+            \Log::error('Stack trace: ' . $e->getTraceAsString());
+            return response()->json([
+                'message' => 'Server Error: ' . $e->getMessage()
+            ], 500);
         }
-        
-        $response = [
-            'success' => true,
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'phone' => $user->phone,
-                'role' => $user->role,
-                'state' => $user->state,
-                'profile_image' => $user->profile_image,
-                'is_active' => $user->is_active,
-                'email_verified_at' => $user->email_verified_at,
-                'phone_verified_at' => $user->phone_verified_at,
-                'created_at' => $user->created_at,
-                'updated_at' => $user->updated_at,
-                'profile_image_blob' => $user->profile_image_blob,
-            ],
-            'loyalty_card' => $loyaltyCard,
-            'id_verification' => [
-                'is_verified' => !is_null($user->id_verified_at),
-                'verified_at' => $user->id_verified_at,
-                'extracted_data' => $user->id_verification_data,
-            ],
-        ];
-
-        // Add store approval status for store users
-        if ($user->role === 'store') {
-            $store = \App\Models\Store::where('user_id', $user->id)->first();
-            if ($store) {
-                $response['store'] = [
-                    'is_approved' => $store->is_approved,
-                    'approved_at' => $store->approved_at,
-                    'approval_notes' => $store->approval_notes,
-                ];
-            }
-        }
-        
-        return response()->json($response);
     }
 
     /**

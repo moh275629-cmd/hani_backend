@@ -16,7 +16,6 @@ class LoyaltyCard extends Model
         'store_id',
         'card_number',
         'qr_code',
-       
     ];
 
     protected $encryptable = [
