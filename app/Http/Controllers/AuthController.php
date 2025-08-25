@@ -81,7 +81,14 @@ class AuthController extends Controller
             'message' => $request->role === 'store' 
                 ? 'Store registered successfully. Please verify your email and wait for admin approval.' 
                 : 'User registered successfully. Please verify your email.',
-            'user' => $user->only(['id', 'name', 'email', 'phone', 'role', 'state']),
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'phone' => $user->phone,
+                'role' => $user->role,
+                'state' => $user->state,
+            ],
             'token' => $token,
             'requires_approval' => $request->role === 'store',
         ], 201);
@@ -159,7 +166,16 @@ class AuthController extends Controller
         $response = [
             'success' => true,
             'message' => 'Login successful',
-            'user' => $user->only(['id', 'name', 'email', 'phone', 'role', 'state', 'state_code', 'is_active']),
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'phone' => $user->phone,
+                'role' => $user->role,
+                'state' => $user->state,
+                'state_code' => $user->state_code,
+                'is_active' => $user->is_active,
+            ],
             'token' => $token,
             'is_active' => $user->is_active, // Add this for easy access
         ];
@@ -352,7 +368,15 @@ class AuthController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'OTP verified successfully',
-                'user' => $user->only(['id', 'name', 'email', 'phone', 'role', 'state', 'is_active']),
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'phone' => $user->phone,
+                    'role' => $user->role,
+                    'state' => $user->state,
+                    'is_active' => $user->is_active,
+                ],
                 'store' => $store,
                 'token' => $token,
             ]);
@@ -406,21 +430,21 @@ class AuthController extends Controller
         
         $response = [
             'success' => true,
-            'user' => $user->only([
-                'id',
-                'name',
-                'email',
-                'phone',
-                'role',
-                'state',
-                'profile_image',
-                'is_active',
-                'email_verified_at',
-                'phone_verified_at',
-                'created_at',
-                'updated_at',
-                'profile_image_blob',
-            ]),
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'phone' => $user->phone,
+                'role' => $user->role,
+                'state' => $user->state,
+                'profile_image' => $user->profile_image,
+                'is_active' => $user->is_active,
+                'email_verified_at' => $user->email_verified_at,
+                'phone_verified_at' => $user->phone_verified_at,
+                'created_at' => $user->created_at,
+                'updated_at' => $user->updated_at,
+                'profile_image_blob' => $user->profile_image_blob,
+            ],
             'loyalty_card' => $loyaltyCard,
             'id_verification' => [
                 'is_verified' => !is_null($user->id_verified_at),
@@ -543,7 +567,16 @@ class AuthController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Profile updated successfully',
-            'user' => $user->only(['id', 'name', 'email', 'phone', 'role', 'state', 'state_code', 'profile_image']),
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'phone' => $user->phone,
+                'role' => $user->role,
+                'state' => $user->state,
+                'state_code' => $user->state_code,
+                'profile_image' => $user->profile_image,
+            ],
         ]);
     }
 
@@ -637,7 +670,14 @@ class AuthController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'ID verification submitted successfully',
-                'user' => $user->only(['id', 'name', 'email', 'phone', 'role', 'state']),
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'phone' => $user->phone,
+                    'role' => $user->role,
+                    'state' => $user->state,
+                ],
             ]);
 
         } catch (\Exception $e) {

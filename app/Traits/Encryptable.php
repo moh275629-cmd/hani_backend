@@ -100,21 +100,5 @@ trait Encryptable
         return json_encode($this->toArray(), $options);
     }
 
-    /**
-     * Get only the specified attributes from the model.
-     *
-     * @param  array  $attributes
-     * @return array
-     */
-    public function only($attributes)
-    {
-        $attributes = is_array($attributes) ? $attributes : func_get_args();
-        $result = [];
-        
-        foreach ($attributes as $attribute) {
-            $result[$attribute] = $this->getAttribute($attribute);
-        }
-        
-        return $result;
-    }
+
 }
