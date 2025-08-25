@@ -50,32 +50,6 @@ class UserSeeder extends Seeder
             'phone_verified_at' => now(),
         ]);
 
-        // Create loyalty card for regular user
-        LoyaltyCard::create([
-            'user_id' => $user->id,
-            'card_number' => $cardNumber,
-            'qr_code' => \App\Models\LoyaltyCard::generateQrCode($user->id, $cardNumber, null),
-            'card_type' => 'standard',
-            'status' => 'active',
-            'issue_date' => now()->toDateString(),
-            'expiry_date' => now()->addYears(2)->toDateString(),
-            'is_active' => true,
-        ]);
-
-        // Create additional test users
-        User::factory(20)->create()->each(function ($user) {
-            if ($user->role === 'client') {
-                LoyaltyCard::create([
-                    'user_id' => $user->id,
-                    'card_number' => $cardNumber,
-                    'qr_code' => \App\Models\LoyaltyCard::generateQrCode($user->id, $cardNumber, null),
-                    'card_type' => 'standard',
-                    'status' => 'active',
-                    'issue_date' => now()->toDateString(),
-                    'expiry_date' => now()->addYears(2)->toDateString(),
-                    'is_active' => true,
-                ]);
-            }
-        });
+      
     }
 }
