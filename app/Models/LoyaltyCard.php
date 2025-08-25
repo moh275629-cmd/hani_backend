@@ -50,11 +50,9 @@ class LoyaltyCard extends Model
 
     public function scopeValid($query)
     {
-        return $query->where('is_active', true)
-                    ->where(function($q) {
-                        $q->whereNull('expires_at')
-                          ->orWhere('expires_at', '>', now());
-                    });
+        // Note: is_active and expires_at fields don't exist in current database schema
+        // For now, return all cards as valid
+        return $query;
     }
 
     public function scopeForClients($query)

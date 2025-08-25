@@ -56,14 +56,6 @@ class UserSeeder extends Seeder
             'store_id' => 1, // Assuming store with ID 1 exists
             'card_number' => 'HANI' . str_pad($user->id, 8, '0', STR_PAD_LEFT),
             'qr_code' => 'QR' . str_pad($user->id, 8, '0', STR_PAD_LEFT),
-            'points_balance' => 0,
-            'total_points_earned' => 0,
-            'total_points_spent' => 0,
-            'card_type' => 'standard',
-            'status' => 'active',
-            'issue_date' => now()->toDateString(),
-            'expiry_date' => now()->addYears(2)->toDateString(),
-            'is_active' => true,
         ]);
 
         // Create additional test users
@@ -74,14 +66,6 @@ class UserSeeder extends Seeder
                     'store_id' => 1, // Assuming store with ID 1 exists
                     'card_number' => 'HANI' . str_pad($user->id, 8, '0', STR_PAD_LEFT),
                     'qr_code' => 'QR' . str_pad($user->id, 8, '0', STR_PAD_LEFT),
-                    'points_balance' => rand(0, 1000),
-                    'total_points_earned' => rand(0, 2000),
-                    'total_points_spent' => rand(0, 500),
-                    'card_type' => 'standard',
-                    'status' => 'active',
-                    'issue_date' => now()->toDateString(),
-                    'expiry_date' => now()->addYears(2)->toDateString(),
-                    'is_active' => true,
                 ]);
             }
         });
