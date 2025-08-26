@@ -311,32 +311,106 @@ class ImageController extends Controller
      */
     public function uploadTempStoreLogo(Request $request)
     {
-        $request->validate([
-            'image' => 'required|image|mimes:jpeg,png,jpg|max:10240'
-        ]);
+        try {
+            \Log::info('uploadTempStoreLogo called');
+            \Log::info('Request has files: ' . $request->hasFile('image'));
+            \Log::info('Request files count: ' . count($request->allFiles()));
+            \Log::info('Request content type: ' . $request->header('Content-Type'));
+            
+            // Debug all request data
+            \Log::info('All request data: ' . json_encode($request->all()));
+            \Log::info('All files: ' . json_encode($request->allFiles()));
+            
+            if ($request->hasFile('image')) {
+                $file = $request->file('image');
+                \Log::info('File details: ' . json_encode([
+                    'original_name' => $file->getClientOriginalName(),
+                    'size' => $file->getSize(),
+                    'mime_type' => $file->getMimeType(),
+                    'extension' => $file->getClientOriginalExtension(),
+                    'is_valid' => $file->isValid(),
+                    'error' => $file->getError(),
+                ]));
+            } else {
+                \Log::error('No image file detected in request');
+                return response()->json([
+                    'message' => 'No image file provided',
+                    'errors' => ['image' => ['The image field is required.']]
+                ], 422);
+            }
 
-        $imageFile = $request->file('image');
-        $imageData = file_get_contents($imageFile->getRealPath());
-        
-        // Generate a temporary ID
-        $tempId = 'temp_logo_' . uniqid();
-        
-        // Store in temporary file instead of session
-        $tempPath = storage_path('app/temp/' . $tempId . '.jpg');
-        
-        // Ensure temp directory exists
-        if (!file_exists(dirname($tempPath))) {
-            mkdir(dirname($tempPath), 0755, true);
+            $imageFile = $request->file('image');
+            
+            // Debug file details
+            \Log::info('Manual validation - File size: ' . $imageFile->getSize() . ' bytes');
+            \Log::info('Manual validation - MIME type: ' . $imageFile->getMimeType());
+            \Log::info('Manual validation - Extension: ' . $imageFile->getClientOriginalExtension());
+            
+            // Check file size manually
+            $fileSize = $imageFile->getSize();
+            $maxSize = 10 * 1024 * 1024; // 10MB in bytes
+            
+            if ($fileSize > $maxSize) {
+                \Log::error('File size validation failed: ' . $fileSize . ' > ' . $maxSize);
+                return response()->json([
+                    'message' => 'File size too large. Maximum allowed: 10MB',
+                    'errors' => ['image' => ['File size too large. Maximum allowed: 10MB']]
+                ], 422);
+            }
+            
+            // Check file type manually
+            $allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
+            $mimeType = $imageFile->getMimeType();
+            
+            if (!in_array($mimeType, $allowedTypes)) {
+                \Log::error('File type validation failed: ' . $mimeType . ' not in ' . json_encode($allowedTypes));
+                return response()->json([
+                    'message' => 'Invalid file type. Allowed: JPEG, PNG, JPG',
+                    'errors' => ['image' => ['Invalid file type. Allowed: JPEG, PNG, JPG']]
+                ], 422);
+            }
+            
+            $imageData = file_get_contents($imageFile->getRealPath());
+            
+            // Generate a temporary ID
+            $tempId = 'temp_logo_' . uniqid();
+            
+            // Store in temporary file instead of session
+            $tempPath = storage_path('app/temp/' . $tempId . '.jpg');
+            
+            // Ensure temp directory exists
+            if (!file_exists(dirname($tempPath))) {
+                mkdir(dirname($tempPath), 0755, true);
+            }
+            
+            // Save the image to temporary file
+            file_put_contents($tempPath, $imageData);
+            
+            return response()->json([
+                'message' => 'Temporary store logo uploaded successfully',
+                'temp_id' => $tempId,
+                'image_url' => "/api/images/temp/{$tempId}",
+                'debug' => [
+                    'temp_path' => $tempPath,
+                    'file_exists' => file_exists($tempPath),
+                    'data_size' => strlen($imageData),
+                    'file_size' => file_exists($tempPath) ? filesize($tempPath) : 0
+                ]
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            \Log::error('Store logo upload validation failed: ' . json_encode($e->errors()));
+            return response()->json([
+                'message' => 'The store logo failed to upload.',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            \Log::error('Store logo upload error: ' . $e->getMessage());
+            \Log::error('Stack trace: ' . $e->getTraceAsString());
+            return response()->json([
+                'message' => 'The store logo failed to upload.',
+                'error' => $e->getMessage()
+            ], 500);
         }
-        
-        // Save the image to temporary file
-        file_put_contents($tempPath, $imageData);
-        
-        return response()->json([
-            'message' => 'Temporary store logo uploaded successfully',
-            'temp_id' => $tempId,
-            'image_url' => "/api/images/temp/{$tempId}"
-        ]);
     }
 
     /**
@@ -434,6 +508,14 @@ class ImageController extends Controller
                 \Log::error('Temporary image data is empty for temp_id: ' . $tempId);
                 return response()->json(['error' => 'Temporary image data is empty', 'temp_id' => $tempId], 404);
             }
+            
+            // Ensure we're working with binary data, not text
+            if (!is_string($imageData)) {
+                \Log::error('Temporary image data is not a string: ' . gettype($imageData));
+                return response()->json(['error' => 'Invalid image data type', 'temp_id' => $tempId], 500);
+            }
+            
+            \Log::info('Image data loaded successfully - Type: ' . gettype($imageData) . ', Size: ' . strlen($imageData) . ' bytes');
 
             // Find the offer
             \Log::info('Looking for offer with ID: ' . $offerId);
@@ -458,10 +540,18 @@ class ImageController extends Controller
             
             // Set the image blob (this will automatically save)
             try {
+                // Ensure we're working with binary data
+                if (!is_string($imageData) || empty($imageData)) {
+                    throw new \Exception('Invalid image data: ' . gettype($imageData) . ', length: ' . (is_string($imageData) ? strlen($imageData) : 'N/A'));
+                }
+                
+                \Log::info('Image data type: ' . gettype($imageData) . ', length: ' . strlen($imageData));
+                
                 $offer->setImageBlob($imageData);
                 \Log::info('setImageBlob called successfully');
             } catch (\Exception $e) {
                 \Log::error('Error in setImageBlob: ' . $e->getMessage());
+                \Log::error('Image data info: ' . (is_string($imageData) ? 'String, length: ' . strlen($imageData) : 'Not string: ' . gettype($imageData)));
                 return response()->json([
                     'error' => 'Failed to set image blob: ' . $e->getMessage(),
                     'temp_id' => $tempId
