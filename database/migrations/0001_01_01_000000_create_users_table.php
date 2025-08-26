@@ -18,7 +18,7 @@ return new class extends Migration
             $table->string('phone')->nullable();
             $table->string('role')->default('client');
             $table->longText('profile_image')->nullable();
-            $table->longText('profile_image_blob')->nullable();
+            $table->mediumBlob('profile_image_blob')->nullable();
             $table->string('state')->nullable();
             $table->string('state_code')->nullable();
             $table->boolean('is_active')->default(true);

@@ -30,7 +30,7 @@ return new class extends Migration
             $table->boolean('is_active')->default(true);
             $table->boolean('is_featured')->default(false);
             $table->string('image')->nullable();
-            $table->longText('image_blob')->nullable();
+            $table->mediumBlob('image_blob')->nullable();
             $table->timestamps();
             
             $table->index(['valid_from', 'valid_until']);
@@ -57,7 +57,7 @@ return new class extends Migration
             $table->boolean('is_active')->default(true);
             $table->boolean('is_featured')->default(false);
             $table->string('image')->nullable();
-            $table->longText('image_blob')->nullable();
+            $table->mediumBlob('image_blob')->nullable();
             $table->timestamps();
             
             $table->index(['valid_from', 'valid_until']);

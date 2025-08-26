@@ -21,9 +21,9 @@ return new class extends Migration
             $table->string('email');
             $table->string('website')->nullable();
             $table->string('logo')->nullable();
-            $table->longText('logo_blob')->nullable();
+            $table->mediumBlob('logo_blob')->nullable();
             $table->string('banner')->nullable();
-            $table->longText('banner_blob')->nullable();
+            $table->mediumBlob('banner_blob')->nullable();
             $table->string('address');
             $table->string('city');
             $table->string('state');
