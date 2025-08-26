@@ -252,3 +252,34 @@ Route::get('/php-config', function () {
         'memory_limit' => ini_get('memory_limit'),
     ]);
 });
+
+Route::get('/test-offer-image', function () {
+    try {
+        // Check if offers table exists and has image_blob column
+        $dbCheck = \DB::select("DESCRIBE offers");
+        $imageBlobColumn = collect($dbCheck)->firstWhere('Field', 'image_blob');
+        
+        // Try to find an offer
+        $offer = \App\Models\Offer::first();
+        
+        return response()->json([
+            'success' => true,
+            'offers_table_exists' => true,
+            'image_blob_column_exists' => $imageBlobColumn ? true : false,
+            'image_blob_column_info' => $imageBlobColumn,
+            'total_offers' => \App\Models\Offer::count(),
+            'sample_offer' => $offer ? [
+                'id' => $offer->id,
+                'title' => $offer->title,
+                'has_image_blob' => $offer->hasImageBlob(),
+                'image_blob_size' => $offer->image_blob ? strlen($offer->image_blob) : 0,
+            ] : null,
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'error' => $e->getMessage(),
+            'stack_trace' => $e->getTraceAsString(),
+        ], 500);
+    }
+});

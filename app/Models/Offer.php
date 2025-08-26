@@ -169,7 +169,7 @@ class Offer extends Model
     public function setImageBlob($imageData)
     {
         $this->image_blob = $imageData;
-        // Don't call save() here - let the caller decide when to save
+        $this->save();
     }
 
     public function getImageBlob()

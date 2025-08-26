@@ -440,59 +440,53 @@ class ImageController extends Controller
             $offer = Offer::findOrFail($offerId);
             \Log::info('Found offer: ' . $offer->id);
             
-            // Debug: Check offer before update (only size, not content)
-            $beforeBlobSize = $offer->image_blob ? strlen($offer->image_blob) : 0;
+            // Check if the image_blob column exists
+            try {
+                $dbCheck = \DB::select("DESCRIBE offers");
+                $imageBlobColumn = collect($dbCheck)->firstWhere('Field', 'image_blob');
+                if (!$imageBlobColumn) {
+                    \Log::error('image_blob column does not exist in offers table');
+                    return response()->json([
+                        'error' => 'Database schema issue: image_blob column not found',
+                        'temp_id' => $tempId
+                    ], 500);
+                }
+                \Log::info('image_blob column exists: ' . json_encode($imageBlobColumn));
+            } catch (\Exception $e) {
+                \Log::error('Error checking database schema: ' . $e->getMessage());
+            }
             
-            // Debug: Check offer attributes
-            $offerAttributes = $offer->getAttributes();
-            $hasImageBlobField = array_key_exists('image_blob', $offerAttributes);
+            // Set the image blob (this will automatically save)
+            try {
+                $offer->setImageBlob($imageData);
+                \Log::info('setImageBlob called successfully');
+            } catch (\Exception $e) {
+                \Log::error('Error in setImageBlob: ' . $e->getMessage());
+                return response()->json([
+                    'error' => 'Failed to set image blob: ' . $e->getMessage(),
+                    'temp_id' => $tempId
+                ], 500);
+            }
             
-            // Debug: Check database directly
-            $dbCheck = \DB::select("DESCRIBE offers");
-            $imageBlobColumn = collect($dbCheck)->firstWhere('Field', 'image_blob');
-            $imageBlobColumnInfo = $imageBlobColumn ? (array) $imageBlobColumn : null;
-            
-            // Debug: Check current value in database (only size)
-            $currentDbValue = \DB::table('offers')->where('id', $offerId)->value('image_blob');
-            $currentDbValueSize = $currentDbValue ? strlen($currentDbValue) : 0;
-            
-            // Set the image blob
-            $offer->setImageBlob($imageData);
-            
-            // Debug: Check offer after setting blob (only size)
-            $afterBlobSize = $offer->image_blob ? strlen($offer->image_blob) : 0;
-            
-            // Debug: Check if the attribute was set (only size)
-            $offerAttributesAfter = $offer->getAttributes();
-            $imageBlobAfter = $offerAttributesAfter['image_blob'] ?? null;
-            $imageBlobAfterSize = $imageBlobAfter ? strlen($imageBlobAfter) : 0;
-            
-            // Save the changes
-            $saved = $offer->save();
-            
-            // Debug: Check offer after save (only size)
-            $offer->refresh(); // Reload from database
+            // Verify the image was saved
+            $offer->refresh();
             $finalBlobSize = $offer->image_blob ? strlen($offer->image_blob) : 0;
             
-            // Fallback: Direct database update if the model save didn't work
-            $dbError = null;
-            if ($finalBlobSize === 0 && $imageData) {
-                try {
-                    \DB::table('offers')
-                        ->where('id', $offerId)
-                        ->update(['image_blob' => $imageData]);
-                    
-                    // Check again
-                    $offer->refresh();
-                    $finalBlobSize = $offer->image_blob ? strlen($offer->image_blob) : 0;
-                } catch (\Exception $e) {
-                    $dbError = $e->getMessage();
-                }
+            if ($finalBlobSize === 0) {
+                \Log::error('Image blob was not saved properly');
+                return response()->json([
+                    'error' => 'Failed to save image to database',
+                    'temp_id' => $tempId,
+                    'image_size' => strlen($imageData)
+                ], 500);
             }
+            
+            \Log::info('Image saved successfully, final blob size: ' . $finalBlobSize);
             
             // Remove the temporary file
             if (file_exists($tempPath)) {
                 unlink($tempPath);
+                \Log::info('Temporary file deleted: ' . $tempPath);
             }
             
             return response()->json([
@@ -502,18 +496,8 @@ class ImageController extends Controller
                 'debug' => [
                     'temp_id' => $tempId,
                     'image_size' => strlen($imageData),
-                    'before_blob_size' => $beforeBlobSize,
-                    'has_image_blob_field' => $hasImageBlobField,
-                    'db_column_info' => $imageBlobColumnInfo,
-                    'current_db_value_size' => $currentDbValueSize,
-                    'after_setting_blob_size' => $afterBlobSize,
-                    'after_setting_attribute_size' => $imageBlobAfterSize,
-                    'after_save_blob_size' => $finalBlobSize,
-                    'save_successful' => $saved,
+                    'final_blob_size' => $finalBlobSize,
                     'temp_file_deleted' => !file_exists($tempPath),
-                    'db_error' => $dbError,
-                    'offer_attributes_keys' => array_keys($offerAttributes),
-                    'image_blob_field_exists' => isset($offerAttributes['image_blob'])
                 ]
             ]);
         } catch (\Exception $e) {
