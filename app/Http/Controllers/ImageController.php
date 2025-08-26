@@ -176,38 +176,67 @@ class ImageController extends Controller
      */
     public function uploadTempOfferImage(Request $request)
     {
-        $request->validate([
-            'image' => 'required|image|mimes:jpeg,png,jpg|max:2048'
-        ]);
+        try {
+            \Log::info('uploadTempOfferImage called');
+            \Log::info('Request has files: ' . $request->hasFile('image'));
+            \Log::info('Request files count: ' . count($request->allFiles()));
+            
+            if ($request->hasFile('image')) {
+                $file = $request->file('image');
+                \Log::info('File details: ' . json_encode([
+                    'original_name' => $file->getClientOriginalName(),
+                    'size' => $file->getSize(),
+                    'mime_type' => $file->getMimeType(),
+                    'extension' => $file->getClientOriginalExtension(),
+                ]));
+            }
+            
+            $request->validate([
+                'image' => 'required|image|mimes:jpeg,png,jpg|max:5120'
+            ]);
 
-        $imageFile = $request->file('image');
-        $imageData = file_get_contents($imageFile->getRealPath());
-        
-        // Generate a temporary ID
-        $tempId = 'temp_' . uniqid();
-        
-        // Store in temporary file instead of session
-        $tempPath = storage_path('app/temp/' . $tempId . '.jpg');
-        
-        // Ensure temp directory exists
-        if (!file_exists(dirname($tempPath))) {
-            mkdir(dirname($tempPath), 0755, true);
+            $imageFile = $request->file('image');
+            $imageData = file_get_contents($imageFile->getRealPath());
+            
+            // Generate a temporary ID
+            $tempId = 'temp_' . uniqid();
+            
+            // Store in temporary file instead of session
+            $tempPath = storage_path('app/temp/' . $tempId . '.jpg');
+            
+            // Ensure temp directory exists
+            if (!file_exists(dirname($tempPath))) {
+                mkdir(dirname($tempPath), 0755, true);
+            }
+            
+            // Save the image to temporary file
+            file_put_contents($tempPath, $imageData);
+            
+            return response()->json([
+                'message' => 'Temporary offer image uploaded successfully',
+                'temp_id' => $tempId,
+                'image_url' => "/api/images/temp/{$tempId}",
+                'debug' => [
+                    'temp_path' => $tempPath,
+                    'file_exists' => file_exists($tempPath),
+                    'data_size' => strlen($imageData),
+                    'file_size' => file_exists($tempPath) ? filesize($tempPath) : 0
+                ]
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            \Log::error('Image upload validation failed: ' . json_encode($e->errors()));
+            return response()->json([
+                'message' => 'The image failed to upload.',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            \Log::error('Image upload error: ' . $e->getMessage());
+            \Log::error('Stack trace: ' . $e->getTraceAsString());
+            return response()->json([
+                'message' => 'The image failed to upload.',
+                'error' => $e->getMessage()
+            ], 500);
         }
-        
-        // Save the image to temporary file
-        file_put_contents($tempPath, $imageData);
-        
-        return response()->json([
-            'message' => 'Temporary offer image uploaded successfully',
-            'temp_id' => $tempId,
-            'image_url' => "/api/images/temp/{$tempId}",
-            'debug' => [
-                'temp_path' => $tempPath,
-                'file_exists' => file_exists($tempPath),
-                'data_size' => strlen($imageData),
-                'file_size' => file_exists($tempPath) ? filesize($tempPath) : 0
-            ]
-        ]);
     }
 
     /**
