@@ -108,7 +108,7 @@ class ImageController extends Controller
     public function uploadStoreLogo(Request $request, $storeId)
     {
         $request->validate([
-            'image' => 'required|image|mimes:jpeg,png,jpg|max:2048'
+            'image' => 'required|image|mimes:jpeg,png,jpg|max:10240'
         ]);
 
         $store = Store::findOrFail($storeId);
@@ -131,7 +131,7 @@ class ImageController extends Controller
     public function uploadStoreBanner(Request $request, $storeId)
     {
         $request->validate([
-            'image' => 'required|image|mimes:jpeg,png,jpg|max:5120'
+            'image' => 'required|image|mimes:jpeg,png,jpg|max:10240'
         ]);
 
         $store = Store::findOrFail($storeId);
@@ -154,7 +154,7 @@ class ImageController extends Controller
     public function uploadOfferImage(Request $request, $offerId)
     {
         $request->validate([
-            'image' => 'required|image|mimes:jpeg,png,jpg|max:2048'
+            'image' => 'required|image|mimes:jpeg,png,jpg|max:10240'
         ]);
 
         $offer = Offer::findOrFail($offerId);
@@ -242,13 +242,13 @@ class ImageController extends Controller
             
             // Check file size manually
             $fileSize = $imageFile->getSize();
-            $maxSize = 5 * 1024 * 1024; // 5MB in bytes
+            $maxSize = 10 * 1024 * 1024; // 10MB in bytes
             
             if ($fileSize > $maxSize) {
                 \Log::error('File size validation failed: ' . $fileSize . ' > ' . $maxSize);
                 return response()->json([
-                    'message' => 'File size too large. Maximum allowed: 5MB',
-                    'errors' => ['image' => ['File size too large. Maximum allowed: 5MB']]
+                    'message' => 'File size too large. Maximum allowed: 10MB',
+                    'errors' => ['image' => ['File size too large. Maximum allowed: 10MB']]
                 ], 422);
             }
             
@@ -312,7 +312,7 @@ class ImageController extends Controller
     public function uploadTempStoreLogo(Request $request)
     {
         $request->validate([
-            'image' => 'required|image|mimes:jpeg,png,jpg|max:2048'
+            'image' => 'required|image|mimes:jpeg,png,jpg|max:10240'
         ]);
 
         $imageFile = $request->file('image');
@@ -345,7 +345,7 @@ class ImageController extends Controller
     public function uploadTempStoreBanner(Request $request)
     {
         $request->validate([
-            'image' => 'required|image|mimes:jpeg,png,jpg|max:5120'
+            'image' => 'required|image|mimes:jpeg,png,jpg|max:10240'
         ]);
 
         $imageFile = $request->file('image');
@@ -551,7 +551,7 @@ class ImageController extends Controller
     public function uploadTempProfileImage(Request $request)
     {
         $request->validate([
-            'image' => 'required|image|mimes:jpeg,png,jpg|max:2048'
+            'image' => 'required|image|mimes:jpeg,png,jpg|max:10240'
         ]);
 
         $imageFile = $request->file('image');

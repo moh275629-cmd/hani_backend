@@ -242,3 +242,13 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 // Store registration specific routes
 Route::get('/store/terms', [App\Http\Controllers\StoreRegistrationController::class, 'getTermsAndConditions']);
 Route::get('/store/required-documents', [App\Http\Controllers\StoreRegistrationController::class, 'getRequiredDocuments']);
+
+Route::get('/php-config', function () {
+    return response()->json([
+        'upload_max_filesize' => ini_get('upload_max_filesize'),
+        'post_max_size' => ini_get('post_max_size'),
+        'max_file_uploads' => ini_get('max_file_uploads'),
+        'max_execution_time' => ini_get('max_execution_time'),
+        'memory_limit' => ini_get('memory_limit'),
+    ]);
+});
