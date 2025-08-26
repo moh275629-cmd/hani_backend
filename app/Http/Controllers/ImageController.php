@@ -180,6 +180,20 @@ class ImageController extends Controller
             \Log::info('uploadTempOfferImage called');
             \Log::info('Request has files: ' . $request->hasFile('image'));
             \Log::info('Request files count: ' . count($request->allFiles()));
+            \Log::info('Request content type: ' . $request->header('Content-Type'));
+            \Log::info('Request content length: ' . $request->header('Content-Length'));
+            \Log::info('Request method: ' . $request->method());
+            \Log::info('Request URL: ' . $request->url());
+            
+            // Debug all request data
+            \Log::info('All request data: ' . json_encode($request->all()));
+            \Log::info('All files: ' . json_encode($request->allFiles()));
+            \Log::info('Request input: ' . json_encode($request->input()));
+            
+            // Debug PHP configuration
+            \Log::info('PHP upload_max_filesize: ' . ini_get('upload_max_filesize'));
+            \Log::info('PHP post_max_size: ' . ini_get('post_max_size'));
+            \Log::info('PHP max_file_uploads: ' . ini_get('max_file_uploads'));
             
             if ($request->hasFile('image')) {
                 $file = $request->file('image');
@@ -188,7 +202,13 @@ class ImageController extends Controller
                     'size' => $file->getSize(),
                     'mime_type' => $file->getMimeType(),
                     'extension' => $file->getClientOriginalExtension(),
+                    'is_valid' => $file->isValid(),
+                    'error' => $file->getError(),
                 ]));
+            } else {
+                \Log::error('No image file detected in request');
+                \Log::error('Request files: ' . json_encode($request->allFiles()));
+                \Log::error('Request input: ' . json_encode($request->input()));
             }
             
             // Temporarily comment out validation to test file upload
@@ -198,9 +218,18 @@ class ImageController extends Controller
 
             // Manual validation
             if (!$request->hasFile('image')) {
+                \Log::error('Manual validation failed: No image file uploaded');
                 return response()->json([
                     'message' => 'No image file was uploaded',
-                    'errors' => ['image' => ['No image file was uploaded']]
+                    'errors' => ['image' => ['No image file was uploaded']],
+                    'debug' => [
+                        'has_file' => $request->hasFile('image'),
+                        'files_count' => count($request->allFiles()),
+                        'content_type' => $request->header('Content-Type'),
+                        'content_length' => $request->header('Content-Length'),
+                        'all_files' => $request->allFiles(),
+                        'all_input' => $request->input(),
+                    ]
                 ], 422);
             }
 
