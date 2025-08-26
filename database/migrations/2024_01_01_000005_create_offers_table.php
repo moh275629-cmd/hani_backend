@@ -3,7 +3,7 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
-
+use Illuminate\Support\Facades\DB;
 return new class extends Migration
 {
     /**
@@ -37,7 +37,6 @@ return new class extends Migration
             $table->index(['discount_type', 'is_active']);
             $table->index(['is_featured', 'is_active']);
         });
-
         Schema::create('offers_temp', function (Blueprint $table) {
             $table->id();
             $table->foreignId('store_id')->constrained()->onDelete('cascade');
@@ -57,13 +56,18 @@ return new class extends Migration
             $table->boolean('is_active')->default(true);
             $table->boolean('is_featured')->default(false);
             $table->string('image')->nullable();
-            $table->binary('image_blob')->nullable();
+            // temporary placeholder, will override with raw SQL
+            // $table->binary('image_blob')->nullable();
             $table->timestamps();
-            
+        
             $table->index(['valid_from', 'valid_until']);
             $table->index(['discount_type', 'is_active']);
             $table->index(['is_featured', 'is_active']);
         });
+        
+        // Add real LONGBLOB column after table is created
+        DB::statement('ALTER TABLE offers_temp ADD image_blob LONGBLOB NULL');
+        
     }
 
     /**
