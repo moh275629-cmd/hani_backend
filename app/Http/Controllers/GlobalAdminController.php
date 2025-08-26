@@ -37,12 +37,34 @@ class GlobalAdminController extends Controller
 
             $admins = $query->paginate($request->get('per_page', 15));
 
+            // Transform the data to handle encrypted fields
+            $transformedData = $admins->getCollection()->map(function ($admin) {
+                return [
+                    'id' => $admin->id,
+                    'name' => $admin->name,
+                    'email' => $admin->email,
+                    'phone' => $admin->phone,
+                    'role' => $admin->role,
+                    'state' => $admin->state,
+                    'is_active' => $admin->is_active,
+                    'email_verified_at' => $admin->email_verified_at,
+                    'phone_verified_at' => $admin->phone_verified_at,
+                    'created_at' => $admin->created_at,
+                    'updated_at' => $admin->updated_at,
+                ];
+            });
+
+            $paginationData = $admins->toArray();
+            $paginationData['data'] = $transformedData;
+
             return response()->json([
                 'message' => 'Admins retrieved successfully',
-                'data' => $admins
+                'data' => $paginationData
             ]);
 
         } catch (\Exception $e) {
+            \Log::error('Error retrieving admins: ' . $e->getMessage());
+            \Log::error('Stack trace: ' . $e->getTraceAsString());
             return response()->json([
                 'message' => 'Error retrieving admins',
                 'error' => $e->getMessage()
@@ -57,11 +79,11 @@ class GlobalAdminController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'name' => 'nullable|string|max:255',
-            'email' => 'required|email|unique:users,email',
+            'email' => 'required|email',
             'phone' => 'nullable|string|max:20',
             'password' => 'required|string|min:8',
-            'role' => 'sometimes|in:admin',
-            'state' => 'required|string|max:255',
+            'role' => 'sometimes|in:admin,global_admin',
+            'state' => 'nullable|string|max:255',
         ]);
 
         if ($validator->fails()) {
@@ -74,6 +96,26 @@ class GlobalAdminController extends Controller
         try {
             DB::beginTransaction();
 
+            // Check if email already exists (handles encrypted emails)
+            $existingUser = User::findByEmail($request->email);
+            if ($existingUser) {
+                return response()->json([
+                    'message' => 'Email already exists',
+                    'errors' => ['email' => ['The email has already been taken.']]
+                ], 422);
+            }
+
+            // Check if phone already exists (handles encrypted phones)
+            if ($request->phone) {
+                $existingUserByPhone = User::findByPhone($request->phone);
+                if ($existingUserByPhone) {
+                    return response()->json([
+                        'message' => 'Phone number already exists',
+                        'errors' => ['phone' => ['The phone number has already been taken.']]
+                    ], 422);
+                }
+            }
+
             $admin = User::create([
                 'name' => $request->name,
                 'email' => $request->email,
@@ -83,17 +125,32 @@ class GlobalAdminController extends Controller
                 'state' => $request->state,
                 'is_active' => true,
                 'email_verified_at' => now(), // Auto-verify admin emails
+                'phone_verified_at' => now(), // Auto-verify admin phones
             ]);
 
             DB::commit();
 
             return response()->json([
                 'message' => 'Admin created successfully',
-                'data' => $admin
+                'data' => [
+                    'id' => $admin->id,
+                    'name' => $admin->name,
+                    'email' => $admin->email,
+                    'phone' => $admin->phone,
+                    'role' => $admin->role,
+                    'state' => $admin->state,
+                    'is_active' => $admin->is_active,
+                    'email_verified_at' => $admin->email_verified_at,
+                    'phone_verified_at' => $admin->phone_verified_at,
+                    'created_at' => $admin->created_at,
+                    'updated_at' => $admin->updated_at,
+                ]
             ], 201);
 
         } catch (\Exception $e) {
             DB::rollBack();
+            \Log::error('Error creating admin: ' . $e->getMessage());
+            \Log::error('Stack trace: ' . $e->getTraceAsString());
             return response()->json([
                 'message' => 'Error creating admin',
                 'error' => $e->getMessage()
@@ -476,13 +533,13 @@ class GlobalAdminController extends Controller
             'description_fr' => 'nullable|string',
             'description_ar' => 'nullable|string',
             'document_type' => 'nullable|in:identity,business,financial,legal,other',
-            'user_category' => 'nullable',
+            'user_category' => 'nullable|in:client,store,admin',
             'file_types' => 'nullable|array',
-            'file_types.*' => 'string|max:50', // each element is a string
+            'file_types.*' => 'string|max:50',
             'max_file_size' => 'nullable|integer|min:1',
             'is_required' => 'boolean',
             'is_active' => 'boolean',
-            'display_order' => 'integer|min:0',
+            'display_order' => 'nullable|integer|min:0',
             'notes' => 'nullable|string',
         ]);
         
@@ -494,7 +551,27 @@ class GlobalAdminController extends Controller
         }
 
         try {
-            $document = RequiredDocuments::create($request->all());
+            // Set defaults for required fields
+            $data = $request->all();
+            
+            // Ensure at least one name is provided
+            if (empty($data['name_en']) && empty($data['name_fr']) && empty($data['name_ar'])) {
+                return response()->json([
+                    'message' => 'At least one name (name_en, name_fr, or name_ar) is required',
+                    'errors' => ['name_en' => ['At least one name is required']]
+                ], 422);
+            }
+
+            // Set defaults
+            $data['document_type'] = $data['document_type'] ?? 'other';
+            $data['user_category'] = $data['user_category'] ?? 'client';
+            $data['file_types'] = $data['file_types'] ?? ['pdf', 'jpg', 'jpeg', 'png'];
+            $data['max_file_size'] = $data['max_file_size'] ?? 2048; // 2MB default
+            $data['is_required'] = $data['is_required'] ?? true;
+            $data['is_active'] = $data['is_active'] ?? true;
+            $data['display_order'] = $data['display_order'] ?? 0;
+
+            $document = RequiredDocuments::create($data);
 
             return response()->json([
                 'message' => 'Required document created successfully',
@@ -502,6 +579,8 @@ class GlobalAdminController extends Controller
             ], 201);
 
         } catch (\Exception $e) {
+            \Log::error('Error creating required document: ' . $e->getMessage());
+            \Log::error('Stack trace: ' . $e->getTraceAsString());
             return response()->json([
                 'message' => 'Error creating required document',
                 'error' => $e->getMessage()

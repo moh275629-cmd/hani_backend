@@ -191,11 +191,49 @@ class ImageController extends Controller
                 ]));
             }
             
-            $request->validate([
-                'image' => 'required|image|mimes:jpeg,png,jpg|max:5120'
-            ]);
+            // Temporarily comment out validation to test file upload
+            // $request->validate([
+            //     'image' => 'required|image|mimes:jpeg,png,jpg|max:5120'
+            // ]);
+
+            // Manual validation
+            if (!$request->hasFile('image')) {
+                return response()->json([
+                    'message' => 'No image file was uploaded',
+                    'errors' => ['image' => ['No image file was uploaded']]
+                ], 422);
+            }
 
             $imageFile = $request->file('image');
+            
+            // Debug file details
+            \Log::info('Manual validation - File size: ' . $imageFile->getSize() . ' bytes');
+            \Log::info('Manual validation - MIME type: ' . $imageFile->getMimeType());
+            \Log::info('Manual validation - Extension: ' . $imageFile->getClientOriginalExtension());
+            
+            // Check file size manually
+            $fileSize = $imageFile->getSize();
+            $maxSize = 5 * 1024 * 1024; // 5MB in bytes
+            
+            if ($fileSize > $maxSize) {
+                \Log::error('File size validation failed: ' . $fileSize . ' > ' . $maxSize);
+                return response()->json([
+                    'message' => 'File size too large. Maximum allowed: 5MB',
+                    'errors' => ['image' => ['File size too large. Maximum allowed: 5MB']]
+                ], 422);
+            }
+            
+            // Check file type manually
+            $allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
+            $mimeType = $imageFile->getMimeType();
+            
+            if (!in_array($mimeType, $allowedTypes)) {
+                \Log::error('File type validation failed: ' . $mimeType . ' not in ' . json_encode($allowedTypes));
+                return response()->json([
+                    'message' => 'Invalid file type. Allowed: JPEG, PNG, JPG',
+                    'errors' => ['image' => ['Invalid file type. Allowed: JPEG, PNG, JPG']]
+                ], 422);
+            }
             $imageData = file_get_contents($imageFile->getRealPath());
             
             // Generate a temporary ID
@@ -631,7 +669,7 @@ class ImageController extends Controller
     }
 
     /**
-     * Test file upload functionality
+     * Test file upload functionality (bypasses validation)
      */
     public function testUpload(Request $request)
     {
