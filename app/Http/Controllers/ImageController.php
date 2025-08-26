@@ -629,4 +629,66 @@ class ImageController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Test file upload functionality
+     */
+    public function testUpload(Request $request)
+    {
+        try {
+            \Log::info('testUpload called');
+            \Log::info('Request has files: ' . $request->hasFile('image'));
+            \Log::info('Request files count: ' . count($request->allFiles()));
+            \Log::info('Request content type: ' . $request->header('Content-Type'));
+            \Log::info('Request content length: ' . $request->header('Content-Length'));
+            
+            // Debug PHP configuration
+            \Log::info('PHP upload_max_filesize: ' . ini_get('upload_max_filesize'));
+            \Log::info('PHP post_max_size: ' . ini_get('post_max_size'));
+            \Log::info('PHP max_file_uploads: ' . ini_get('max_file_uploads'));
+            
+            if ($request->hasFile('image')) {
+                $file = $request->file('image');
+                \Log::info('File details: ' . json_encode([
+                    'original_name' => $file->getClientOriginalName(),
+                    'size' => $file->getSize(),
+                    'mime_type' => $file->getMimeType(),
+                    'extension' => $file->getClientOriginalExtension(),
+                    'is_valid' => $file->isValid(),
+                    'error' => $file->getError(),
+                ]));
+                
+                return response()->json([
+                    'success' => true,
+                    'message' => 'File upload test successful',
+                    'file_info' => [
+                        'name' => $file->getClientOriginalName(),
+                        'size' => $file->getSize(),
+                        'mime_type' => $file->getMimeType(),
+                        'extension' => $file->getClientOriginalExtension(),
+                        'is_valid' => $file->isValid(),
+                        'error' => $file->getError(),
+                    ]
+                ]);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No file uploaded',
+                    'request_info' => [
+                        'has_files' => $request->hasFile('image'),
+                        'files_count' => count($request->allFiles()),
+                        'content_type' => $request->header('Content-Type'),
+                        'content_length' => $request->header('Content-Length'),
+                    ]
+                ], 400);
+            }
+        } catch (\Exception $e) {
+            \Log::error('Test upload error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Test upload failed: ' . $e->getMessage(),
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 }

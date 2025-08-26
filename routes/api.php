@@ -177,6 +177,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/images/offer/{offerId}/move-temp', [ImageController::class, 'moveTempOfferImage']);
     Route::post('/images/profile/temp', [ImageController::class, 'uploadTempProfileImage']);
     Route::post('/images/profile/move-temp', [ImageController::class, 'moveTempProfileImage']);
+    Route::post('/images/test-upload', [ImageController::class, 'testUpload']); // Test route for debugging
     
     // QR Code generation
     Route::get('/qr/generate', [QRController::class, 'generate']);
