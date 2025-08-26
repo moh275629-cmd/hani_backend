@@ -316,10 +316,22 @@ class ImageController extends Controller
             \Log::info('Request has files: ' . $request->hasFile('image'));
             \Log::info('Request files count: ' . count($request->allFiles()));
             \Log::info('Request content type: ' . $request->header('Content-Type'));
+            \Log::info('Request method: ' . $request->method());
+            \Log::info('Request URL: ' . $request->url());
             
             // Debug all request data
             \Log::info('All request data: ' . json_encode($request->all()));
             \Log::info('All files: ' . json_encode($request->allFiles()));
+            \Log::info('Request input: ' . json_encode($request->input()));
+            
+            // Debug PHP configuration
+            \Log::info('PHP upload_max_filesize: ' . ini_get('upload_max_filesize'));
+            \Log::info('PHP post_max_size: ' . ini_get('post_max_size'));
+            \Log::info('PHP max_file_uploads: ' . ini_get('max_file_uploads'));
+            
+            // Debug raw request
+            \Log::info('Raw request body length: ' . strlen($request->getContent()));
+            \Log::info('Request headers: ' . json_encode($request->headers->all()));
             
             if ($request->hasFile('image')) {
                 $file = $request->file('image');
@@ -333,10 +345,46 @@ class ImageController extends Controller
                 ]));
             } else {
                 \Log::error('No image file detected in request');
-                return response()->json([
-                    'message' => 'No image file provided',
-                    'errors' => ['image' => ['The image field is required.']]
-                ], 422);
+                
+                // Try alternative methods to detect the file
+                \Log::info('Trying alternative file detection methods...');
+                
+                // Check if there are any files at all
+                $allFiles = $request->allFiles();
+                \Log::info('All files in request: ' . json_encode($allFiles));
+                
+                // Check if the file might be in a different field name
+                foreach ($allFiles as $fieldName => $file) {
+                    \Log::info("Found file in field '$fieldName': " . json_encode([
+                        'original_name' => $file->getClientOriginalName(),
+                        'size' => $file->getSize(),
+                        'mime_type' => $file->getMimeType(),
+                    ]));
+                }
+                
+                // Check if there's a file in the 'image' field specifically
+                if (isset($allFiles['image'])) {
+                    \Log::info('File found in image field via allFiles()');
+                    $imageFile = $allFiles['image'];
+                } else {
+                    \Log::error('No image file found in any field');
+                    
+                    // Additional debugging for multipart issues
+                    \Log::info('Request body preview: ' . substr($request->getContent(), 0, 500));
+                    \Log::info('Content-Type header: ' . $request->header('Content-Type'));
+                    
+                    return response()->json([
+                        'message' => 'No image file provided',
+                        'errors' => ['image' => ['The image field is required.']],
+                        'debug' => [
+                            'has_file_image' => $request->hasFile('image'),
+                            'all_files' => array_keys($allFiles),
+                            'request_data' => $request->all(),
+                            'content_type' => $request->header('Content-Type'),
+                            'body_length' => strlen($request->getContent()),
+                        ]
+                    ], 422);
+                }
             }
 
             $imageFile = $request->file('image');
@@ -782,11 +830,22 @@ class ImageController extends Controller
             \Log::info('Request files count: ' . count($request->allFiles()));
             \Log::info('Request content type: ' . $request->header('Content-Type'));
             \Log::info('Request content length: ' . $request->header('Content-Length'));
+            \Log::info('Request method: ' . $request->method());
+            \Log::info('Request URL: ' . $request->url());
+            
+            // Debug all request data
+            \Log::info('All request data: ' . json_encode($request->all()));
+            \Log::info('All files: ' . json_encode($request->allFiles()));
+            \Log::info('Request input: ' . json_encode($request->input()));
             
             // Debug PHP configuration
             \Log::info('PHP upload_max_filesize: ' . ini_get('upload_max_filesize'));
             \Log::info('PHP post_max_size: ' . ini_get('post_max_size'));
             \Log::info('PHP max_file_uploads: ' . ini_get('max_file_uploads'));
+            
+            // Debug raw request
+            \Log::info('Raw request body length: ' . strlen($request->getContent()));
+            \Log::info('Request headers: ' . json_encode($request->headers->all()));
             
             if ($request->hasFile('image')) {
                 $file = $request->file('image');
@@ -812,6 +871,22 @@ class ImageController extends Controller
                     ]
                 ]);
             } else {
+                // Try alternative methods to detect the file
+                \Log::info('Trying alternative file detection methods...');
+                
+                // Check if there are any files at all
+                $allFiles = $request->allFiles();
+                \Log::info('All files in request: ' . json_encode($allFiles));
+                
+                // Check if the file might be in a different field name
+                foreach ($allFiles as $fieldName => $file) {
+                    \Log::info("Found file in field '$fieldName': " . json_encode([
+                        'original_name' => $file->getClientOriginalName(),
+                        'size' => $file->getSize(),
+                        'mime_type' => $file->getMimeType(),
+                    ]));
+                }
+                
                 return response()->json([
                     'success' => false,
                     'message' => 'No file uploaded',
@@ -820,11 +895,14 @@ class ImageController extends Controller
                         'files_count' => count($request->allFiles()),
                         'content_type' => $request->header('Content-Type'),
                         'content_length' => $request->header('Content-Length'),
+                        'all_files' => array_keys($allFiles),
+                        'request_data' => $request->all(),
                     ]
                 ], 400);
             }
         } catch (\Exception $e) {
             \Log::error('Test upload error: ' . $e->getMessage());
+            \Log::error('Stack trace: ' . $e->getTraceAsString());
             return response()->json([
                 'success' => false,
                 'message' => 'Test upload failed: ' . $e->getMessage(),
