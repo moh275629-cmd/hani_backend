@@ -30,13 +30,16 @@ return new class extends Migration
             $table->boolean('is_active')->default(true);
             $table->boolean('is_featured')->default(false);
             $table->string('image')->nullable();
-            $table->binary('image_blob')->nullable();
+            // temporary placeholder, will override with raw SQL
+            // $table->binary('image_blob')->nullable();
             $table->timestamps();
             
             $table->index(['valid_from', 'valid_until']);
             $table->index(['discount_type', 'is_active']);
             $table->index(['is_featured', 'is_active']);
         });
+        DB::statement('ALTER TABLE offers ADD image_blob LONGBLOB NULL');
+       
         Schema::create('offers_temp', function (Blueprint $table) {
             $table->id();
             $table->foreignId('store_id')->constrained()->onDelete('cascade');

@@ -71,7 +71,11 @@ class FileUploadService
      */
     public function uploadProfilePicture(UploadedFile $file, int $userId): array
     {
-        $allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+        $allowedTypes = [
+    'image/jpeg', 'image/png', 'image/jpg', 
+    'image/gif', 'image/webp', 'image/bmp',
+    'image/svg+xml'
+];
         $directory = "profile_pictures/{$userId}";
         
         return $this->uploadFile($file, $directory, $allowedTypes);
@@ -97,7 +101,11 @@ class FileUploadService
      */
     public function uploadStoreImage(UploadedFile $file, int $storeId, string $imageType = 'general'): array
     {
-        $allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+        $allowedTypes = [
+    'image/jpeg', 'image/png', 'image/jpg', 
+    'image/gif', 'image/webp', 'image/bmp',
+    'image/svg+xml'
+];
         $directory = "stores/{$storeId}/{$imageType}";
         
         return $this->uploadFile($file, $directory, $allowedTypes);
@@ -108,7 +116,11 @@ class FileUploadService
      */
     public function uploadOfferImage(UploadedFile $file, int $offerId): array
     {
-        $allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+        $allowedTypes = [
+    'image/jpeg', 'image/png', 'image/jpg', 
+    'image/gif', 'image/webp', 'image/bmp',
+    'image/svg+xml'
+];
         $directory = "offers/{$offerId}";
         
         return $this->uploadFile($file, $directory, $allowedTypes);

@@ -178,96 +178,58 @@ class ImageController extends Controller
     {
         try {
             \Log::info('uploadTempOfferImage called');
-            \Log::info('Request has files: ' . $request->hasFile('image'));
-            \Log::info('Request files count: ' . count($request->allFiles()));
-            \Log::info('Request content type: ' . $request->header('Content-Type'));
             
-            // Manual validation
-            if (!$request->hasFile('image')) {
-                \Log::error('Manual validation failed: No image file uploaded');
-                
-                // Additional debugging for PNG files
-                $allFiles = $request->allFiles();
-                \Log::info('All files in request: ' . json_encode($allFiles));
-                
-                // Check if there's a file in the 'image' field specifically
-                if (isset($allFiles['image'])) {
-                    \Log::info('File found in image field via allFiles()');
-                    $imageFile = $allFiles['image'];
-                    \Log::info('File details from allFiles: ' . json_encode([
-                        'original_name' => $imageFile->getClientOriginalName(),
-                        'size' => $imageFile->getSize(),
-                        'mime_type' => $imageFile->getMimeType(),
-                        'extension' => $imageFile->getClientOriginalExtension(),
-                        'is_valid' => $imageFile->isValid(),
-                        'error' => $imageFile->getError(),
-                    ]));
-                } else {
-                    \Log::error('No image file found in any field');
-                    return response()->json([
-                        'message' => 'No image file was uploaded',
-                        'errors' => ['image' => ['No image file was uploaded']],
-                        'debug' => [
-                            'has_file' => $request->hasFile('image'),
-                            'files_count' => count($request->allFiles()),
-                            'content_type' => $request->header('Content-Type'),
-                            'all_files' => $request->allFiles(),
-                            'all_input' => $request->input(),
-                        ]
-                    ], 422);
-                }
-            } else {
-                $imageFile = $request->file('image');
+            // Check if file exists in any field
+            if (!$request->hasFile('image') && count($request->allFiles()) === 0) {
+                \Log::error('No files uploaded');
+                return response()->json([
+                    'message' => 'No image file was uploaded',
+                    'errors' => ['image' => ['No image file was uploaded']]
+                ], 422);
             }
-            
+    
+            // Get the first file regardless of field name
+            $imageFile = $request->hasFile('image') 
+                ? $request->file('image') 
+                : collect($request->allFiles())->first();
+    
+            if (!$imageFile) {
+                \Log::error('No valid file found');
+                return response()->json([
+                    'message' => 'No valid file found',
+                    'errors' => ['image' => ['No valid file found']]
+                ], 422);
+            }
+    
             // Debug file details
-            \Log::info('Manual validation - File size: ' . $imageFile->getSize() . ' bytes');
-            \Log::info('Manual validation - MIME type: ' . $imageFile->getMimeType());
-            \Log::info('Manual validation - Extension: ' . $imageFile->getClientOriginalExtension());
-            
-            // Check file size manually
-            $fileSize = $imageFile->getSize();
-            $maxSize = 10 * 1024 * 1024; // 10MB in bytes
-            
-            if ($fileSize > $maxSize) {
-                \Log::error('File size validation failed: ' . $fileSize . ' > ' . $maxSize);
+            \Log::info('File details: ', [
+                'original_name' => $imageFile->getClientOriginalName(),
+                'size' => $imageFile->getSize(),
+                'mime_type' => $imageFile->getMimeType(),
+                'extension' => $imageFile->getClientOriginalExtension(),
+                'path' => $imageFile->getRealPath(),
+                'is_valid' => $imageFile->isValid(),
+            ]);
+    
+            // Check if file is valid
+            if (!$imageFile->isValid()) {
+                \Log::error('File upload error: ' . $imageFile->getErrorMessage());
                 return response()->json([
-                    'message' => 'File size too large. Maximum allowed: 10MB',
-                    'errors' => ['image' => ['File size too large. Maximum allowed: 10MB']]
+                    'message' => 'File upload error: ' . $imageFile->getErrorMessage(),
+                    'errors' => ['image' => ['File upload error']]
                 ], 422);
             }
-            
-            // Check file type manually - accept all common image formats
-            $allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif', 'image/webp', 'image/bmp'];
-            $mimeType = $imageFile->getMimeType();
-            
-            if (!in_array($mimeType, $allowedTypes)) {
-                \Log::error('File type validation failed: ' . $mimeType . ' not in ' . json_encode($allowedTypes));
-                return response()->json([
-                    'message' => 'Invalid file type. Allowed: JPEG, PNG, JPG, GIF, WEBP, BMP',
-                    'errors' => ['image' => ['Invalid file type. Allowed: JPEG, PNG, JPG, GIF, WEBP, BMP']]
-                ], 422);
-            }
-            
+    
+            // Rest of your existing code...
             $imageData = file_get_contents($imageFile->getRealPath());
             
             // Generate a temporary ID
             $tempId = 'temp_' . uniqid();
             
-            // Determine file extension based on MIME type
-            $extension = 'jpg'; // default
+            // Use original extension
+            $extension = $imageFile->getClientOriginalExtension();
             
-            if ($mimeType === 'image/png') {
-                $extension = 'png';
-            } elseif ($mimeType === 'image/gif') {
-                $extension = 'gif';
-            } elseif ($mimeType === 'image/webp') {
-                $extension = 'webp';
-            } elseif ($mimeType === 'image/bmp') {
-                $extension = 'bmp';
-            }
-            
-            // Store in temporary file with proper extension
+            // Store in temporary file
             $tempPath = storage_path('app/temp/' . $tempId . '.' . $extension);
             
             // Ensure temp directory exists
@@ -282,14 +244,6 @@ class ImageController extends Controller
                 'message' => 'Temporary offer image uploaded successfully',
                 'temp_id' => $tempId,
                 'image_url' => "/api/images/temp/{$tempId}",
-                'debug' => [
-                    'temp_path' => $tempPath,
-                    'file_exists' => file_exists($tempPath),
-                    'data_size' => strlen($imageData),
-                    'file_size' => file_exists($tempPath) ? filesize($tempPath) : 0,
-                    'mime_type' => $mimeType,
-                    'extension' => $extension
-                ]
             ]);
         } catch (\Exception $e) {
             \Log::error('Image upload error: ' . $e->getMessage());
@@ -348,7 +302,11 @@ class ImageController extends Controller
             }
             
             // Check file type manually - accept all common image formats
-            $allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif', 'image/webp', 'image/bmp'];
+            $allowedTypes = [
+    'image/jpeg', 'image/png', 'image/jpg', 
+    'image/gif', 'image/webp', 'image/bmp',
+    'image/svg+xml'
+];
             $mimeType = $imageFile->getMimeType();
             
             if (!in_array($mimeType, $allowedTypes)) {
@@ -458,7 +416,11 @@ class ImageController extends Controller
             }
             
             // Check file type manually - accept all common image formats
-            $allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif', 'image/webp', 'image/bmp'];
+            $allowedTypes = [
+    'image/jpeg', 'image/png', 'image/jpg', 
+    'image/gif', 'image/webp', 'image/bmp',
+    'image/svg+xml'
+];
             $mimeType = $imageFile->getMimeType();
             
             if (!in_array($mimeType, $allowedTypes)) {
@@ -771,7 +733,11 @@ class ImageController extends Controller
             }
             
             // Check file type manually - accept all common image formats
-            $allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif', 'image/webp', 'image/bmp'];
+            $allowedTypes = [
+    'image/jpeg', 'image/png', 'image/jpg', 
+    'image/gif', 'image/webp', 'image/bmp',
+    'image/svg+xml'
+];
             $mimeType = $imageFile->getMimeType();
             
             if (!in_array($mimeType, $allowedTypes)) {
@@ -883,7 +849,11 @@ class ImageController extends Controller
             }
             
             // Check file type manually - accept all common image formats
-            $allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif', 'image/webp', 'image/bmp'];
+            $allowedTypes = [
+    'image/jpeg', 'image/png', 'image/jpg', 
+    'image/gif', 'image/webp', 'image/bmp',
+    'image/svg+xml'
+];
             $mimeType = $imageFile->getMimeType();
             
             if (!in_array($mimeType, $allowedTypes)) {
