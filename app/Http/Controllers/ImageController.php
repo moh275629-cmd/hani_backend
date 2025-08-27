@@ -114,7 +114,27 @@ class ImageController extends Controller
         $store = Store::findOrFail($storeId);
         
         $imageFile = $request->file('image');
-        $imageData = file_get_contents($imageFile->getRealPath());
+        // Read image bytes robustly (some hosts return empty real path for larger files)
+        $realPath = $imageFile->getRealPath();
+        $pathToRead = $realPath && is_readable($realPath) ? $realPath : $imageFile->getPathname();
+        if (!$pathToRead || !is_readable($pathToRead)) {
+            // Fallback to Symfony UploadedFile::get() which reads the stream
+            $imageData = $imageFile->get();
+        } else {
+            $imageData = file_get_contents($pathToRead);
+        }
+        if (empty($imageData)) {
+            \Log::error('Failed to read uploaded image data', [
+                'real_path' => $realPath,
+                'pathname' => $imageFile->getPathname(),
+                'size' => $imageFile->getSize(),
+                'mime' => $imageFile->getMimeType(),
+            ]);
+            return response()->json([
+                'message' => 'The profile image failed to upload.',
+                'error' => 'Uploaded file could not be read',
+            ], 500);
+        }
         
         $store->setLogoBlob($imageData);
         
