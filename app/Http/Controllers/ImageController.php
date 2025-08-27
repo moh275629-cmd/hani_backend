@@ -108,7 +108,7 @@ class ImageController extends Controller
     public function uploadStoreLogo(Request $request, $storeId)
     {
         $request->validate([
-            'image' => 'required|image|mimes:jpeg,png,jpg|max:10240'
+            'image' => 'required|image|mimes:jpeg,png,jpg,gif,webp,bmp|max:10240' // 10MB max
         ]);
 
         $store = Store::findOrFail($storeId);
@@ -131,7 +131,7 @@ class ImageController extends Controller
     public function uploadStoreBanner(Request $request, $storeId)
     {
         $request->validate([
-            'image' => 'required|image|mimes:jpeg,png,jpg|max:10240'
+            'image' => 'required|image|mimes:jpeg,png,jpg,gif,webp,bmp|max:10240' // 10MB max
         ]);
 
         $store = Store::findOrFail($storeId);
@@ -154,7 +154,7 @@ class ImageController extends Controller
     public function uploadOfferImage(Request $request, $offerId)
     {
         $request->validate([
-            'image' => 'required|image|mimes:jpeg,png,jpg|max:10240'
+            'image' => 'required|image|mimes:jpeg,png,jpg,gif,webp,bmp|max:10240' // 10MB max
         ]);
 
         $offer = Offer::findOrFail($offerId);
@@ -201,9 +201,26 @@ class ImageController extends Controller
                 ], 422);
             }
     
+            // Sanitize file name
+            $originalName = $imageFile->getClientOriginalName();
+            $sanitizedName = preg_replace('/[^a-zA-Z0-9._-]/', '_', $originalName);
+            
+            if ($originalName !== $sanitizedName) {
+                \Log::info('File name sanitized: "' . $originalName . '" -> "' . $sanitizedName . '"');
+                // Rename the file with sanitized name
+                $imageFile = new \Illuminate\Http\UploadedFile(
+                    $imageFile->getRealPath(),
+                    $sanitizedName,
+                    $imageFile->getClientMimeType(),
+                    $imageFile->getError(),
+                    true
+                );
+            }
+    
             // Debug file details
             \Log::info('File details: ', [
-                'original_name' => $imageFile->getClientOriginalName(),
+                'original_name' => $originalName,
+                'sanitized_name' => $sanitizedName,
                 'size' => $imageFile->getSize(),
                 'mime_type' => $imageFile->getMimeType(),
                 'extension' => $imageFile->getClientOriginalExtension(),
@@ -220,7 +237,6 @@ class ImageController extends Controller
                 ], 422);
             }
     
-            // Rest of your existing code...
             $imageData = file_get_contents($imageFile->getRealPath());
             
             // Generate a temporary ID
@@ -254,7 +270,6 @@ class ImageController extends Controller
             ], 500);
         }
     }
-
     /**
      * Upload temporary store logo (for new stores)
      */
