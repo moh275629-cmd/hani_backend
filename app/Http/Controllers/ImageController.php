@@ -828,8 +828,8 @@ class ImageController extends Controller
             \Log::info('Request files count: ' . count($request->allFiles()));
             \Log::info('Request content type: ' . $request->header('Content-Type'));
             
-            // Manual validation
-            if (!$request->hasFile('image')) {
+            // Manual validation (accept any file field name)
+            if (!$request->hasFile('image') && count($request->allFiles()) === 0) {
                 \Log::error('Manual validation failed: No image file uploaded');
                 return response()->json([
                     'message' => 'No image file was uploaded',
@@ -844,7 +844,18 @@ class ImageController extends Controller
                 ], 422);
             }
 
-        $imageFile = $request->file('image');
+            // If 'image' field missing, fall back to first uploaded file
+            $imageFile = $request->hasFile('image')
+                ? $request->file('image')
+                : collect($request->allFiles())->first();
+
+            if (!$imageFile) {
+                \Log::error('No valid file found in request');
+                return response()->json([
+                    'message' => 'No valid file found',
+                    'errors' => ['image' => ['No valid file found']],
+                ], 422);
+            }
             
             // Debug file details
             \Log::info('Manual validation - File size: ' . $imageFile->getSize() . ' bytes');
