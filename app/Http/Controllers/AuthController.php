@@ -546,7 +546,15 @@ class AuthController extends Controller
             ], 422);
         }
 
-        $user->update($request->only(['name', 'phone', 'state', 'state_code', 'profile_image']));
+        // Update user profile fields
+        $updateData = $request->only(['name', 'phone', 'state', 'state_code']);
+        
+        // Handle profile image URL update
+        if ($request->has('profile_image') && $request->profile_image) {
+            $updateData['profile_image'] = $request->profile_image;
+        }
+        
+        $user->update($updateData);
 
         return response()->json([
             'success' => true,

@@ -716,48 +716,224 @@ class ImageController extends Controller
     }
 
     /**
+     * Upload profile image directly (for client users - no admin approval needed)
+     */
+    public function uploadProfileImage(Request $request)
+    {
+        try {
+            \Log::info('uploadProfileImage called');
+            \Log::info('Request has files: ' . $request->hasFile('image'));
+            \Log::info('Request files count: ' . count($request->allFiles()));
+            \Log::info('Request content type: ' . $request->header('Content-Type'));
+            
+            // Manual validation
+            if (!$request->hasFile('image')) {
+                \Log::error('Manual validation failed: No image file uploaded');
+                return response()->json([
+                    'message' => 'No image file was uploaded',
+                    'errors' => ['image' => ['No image file was uploaded']],
+                    'debug' => [
+                        'has_file' => $request->hasFile('image'),
+                        'files_count' => count($request->allFiles()),
+                        'content_type' => $request->header('Content-Type'),
+                        'all_files' => $request->allFiles(),
+                        'all_input' => $request->input(),
+                    ]
+                ], 422);
+            }
+
+            $imageFile = $request->file('image');
+            
+            // Debug file details
+            \Log::info('Manual validation - File size: ' . $imageFile->getSize() . ' bytes');
+            \Log::info('Manual validation - MIME type: ' . $imageFile->getMimeType());
+            \Log::info('Manual validation - Extension: ' . $imageFile->getClientOriginalExtension());
+            
+            // Check file size manually
+            $fileSize = $imageFile->getSize();
+            $maxSize = 10 * 1024 * 1024; // 10MB in bytes
+            
+            if ($fileSize > $maxSize) {
+                \Log::error('File size validation failed: ' . $fileSize . ' > ' . $maxSize);
+                return response()->json([
+                    'message' => 'File size too large. Maximum allowed: 10MB',
+                    'errors' => ['image' => ['File size too large. Maximum allowed: 10MB']]
+                ], 422);
+            }
+            
+            // Check file type manually - accept all common image formats
+            $allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif', 'image/webp', 'image/bmp'];
+            $mimeType = $imageFile->getMimeType();
+            
+            if (!in_array($mimeType, $allowedTypes)) {
+                \Log::error('File type validation failed: ' . $mimeType . ' not in ' . json_encode($allowedTypes));
+                return response()->json([
+                    'message' => 'Invalid file type. Allowed: JPEG, PNG, JPG, GIF, WEBP, BMP',
+                    'errors' => ['image' => ['Invalid file type. Allowed: JPEG, PNG, JPG, GIF, WEBP, BMP']]
+                ], 422);
+            }
+            
+            $imageData = file_get_contents($imageFile->getRealPath());
+            
+            // Get the authenticated user
+            $user = auth()->user();
+            \Log::info('User found: ' . $user->id . ' - ' . $user->email . ' - Role: ' . $user->role);
+            
+            // Set the profile image blob
+            $user->setProfileImageBlob($imageData);
+            \Log::info('setProfileImageBlob called successfully');
+            
+            // Also set the profile_image field with the URL
+            $user->profile_image = "/api/images/user/{$user->id}/profile";
+            \Log::info('profile_image URL set to: ' . $user->profile_image);
+            
+            // Save the user
+            $saved = $user->save();
+            \Log::info('User save result: ' . ($saved ? 'true' : 'false'));
+            
+            // Verify the image was saved
+            $user->refresh();
+            $finalBlobSize = $user->profile_image_blob ? strlen($user->profile_image_blob) : 0;
+            \Log::info('Final profile_image_blob size: ' . $finalBlobSize);
+            \Log::info('Final profile_image URL: ' . $user->profile_image);
+            
+            if ($finalBlobSize === 0) {
+                \Log::error('Profile image blob was not saved properly');
+                return response()->json([
+                    'error' => 'Failed to save profile image to database',
+                    'image_size' => strlen($imageData)
+                ], 500);
+            }
+            
+            return response()->json([
+                'message' => 'Profile image uploaded successfully',
+                'user_id' => $user->id,
+                'image_url' => "/api/images/user/{$user->id}/profile",
+                'debug' => [
+                    'image_size' => strlen($imageData),
+                    'final_blob_size' => $finalBlobSize,
+                    'profile_image_url' => $user->profile_image,
+                    'mime_type' => $mimeType,
+                ]
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Profile image upload error: ' . $e->getMessage());
+            \Log::error('Stack trace: ' . $e->getTraceAsString());
+            return response()->json([
+                'message' => 'The profile image failed to upload.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Upload temporary profile image
      */
     public function uploadTempProfileImage(Request $request)
     {
-        $request->validate([
-            'image' => 'required|image|mimes:jpeg,png,jpg,gif,webp|max:10240'
-        ]);
+        try {
+            \Log::info('uploadTempProfileImage called');
+            \Log::info('Request has files: ' . $request->hasFile('image'));
+            \Log::info('Request files count: ' . count($request->allFiles()));
+            \Log::info('Request content type: ' . $request->header('Content-Type'));
+            
+            // Manual validation
+            if (!$request->hasFile('image')) {
+                \Log::error('Manual validation failed: No image file uploaded');
+                return response()->json([
+                    'message' => 'No image file was uploaded',
+                    'errors' => ['image' => ['No image file was uploaded']],
+                    'debug' => [
+                        'has_file' => $request->hasFile('image'),
+                        'files_count' => count($request->allFiles()),
+                        'content_type' => $request->header('Content-Type'),
+                        'all_files' => $request->allFiles(),
+                        'all_input' => $request->input(),
+                    ]
+                ], 422);
+            }
 
-        $imageFile = $request->file('image');
-        $imageData = file_get_contents($imageFile->getRealPath());
-        
-        // Generate a temporary ID
-        $tempId = 'temp_profile_' . uniqid();
-        
-        // Determine file extension based on MIME type
-        $mimeType = $imageFile->getMimeType();
-        $extension = 'jpg'; // default
-        
-        if ($mimeType === 'image/png') {
-            $extension = 'png';
-        } elseif ($mimeType === 'image/gif') {
-            $extension = 'gif';
-        } elseif ($mimeType === 'image/webp') {
-            $extension = 'webp';
+            $imageFile = $request->file('image');
+            
+            // Debug file details
+            \Log::info('Manual validation - File size: ' . $imageFile->getSize() . ' bytes');
+            \Log::info('Manual validation - MIME type: ' . $imageFile->getMimeType());
+            \Log::info('Manual validation - Extension: ' . $imageFile->getClientOriginalExtension());
+            
+            // Check file size manually
+            $fileSize = $imageFile->getSize();
+            $maxSize = 10 * 1024 * 1024; // 10MB in bytes
+            
+            if ($fileSize > $maxSize) {
+                \Log::error('File size validation failed: ' . $fileSize . ' > ' . $maxSize);
+                return response()->json([
+                    'message' => 'File size too large. Maximum allowed: 10MB',
+                    'errors' => ['image' => ['File size too large. Maximum allowed: 10MB']]
+                ], 422);
+            }
+            
+            // Check file type manually - accept all common image formats
+            $allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif', 'image/webp', 'image/bmp'];
+            $mimeType = $imageFile->getMimeType();
+            
+            if (!in_array($mimeType, $allowedTypes)) {
+                \Log::error('File type validation failed: ' . $mimeType . ' not in ' . json_encode($allowedTypes));
+                return response()->json([
+                    'message' => 'Invalid file type. Allowed: JPEG, PNG, JPG, GIF, WEBP, BMP',
+                    'errors' => ['image' => ['Invalid file type. Allowed: JPEG, PNG, JPG, GIF, WEBP, BMP']]
+                ], 422);
+            }
+            
+            $imageData = file_get_contents($imageFile->getRealPath());
+            
+            // Generate a temporary ID
+            $tempId = 'temp_profile_' . uniqid();
+            
+            // Determine file extension based on MIME type
+            $extension = 'jpg'; // default
+            
+            if ($mimeType === 'image/png') {
+                $extension = 'png';
+            } elseif ($mimeType === 'image/gif') {
+                $extension = 'gif';
+            } elseif ($mimeType === 'image/webp') {
+                $extension = 'webp';
+            } elseif ($mimeType === 'image/bmp') {
+                $extension = 'bmp';
+            }
+            
+            // Store in temporary file with proper extension
+            $tempPath = storage_path('app/temp/' . $tempId . '.' . $extension);
+            
+            // Ensure temp directory exists
+            if (!file_exists(dirname($tempPath))) {
+                mkdir(dirname($tempPath), 0755, true);
+            }
+            
+            // Save the image to temporary file
+            file_put_contents($tempPath, $imageData);
+            
+            return response()->json([
+                'message' => 'Temporary profile image uploaded successfully',
+                'temp_id' => $tempId,
+                'image_url' => "/api/images/temp/{$tempId}",
+                'debug' => [
+                    'temp_path' => $tempPath,
+                    'file_exists' => file_exists($tempPath),
+                    'data_size' => strlen($imageData),
+                    'file_size' => file_exists($tempPath) ? filesize($tempPath) : 0,
+                    'mime_type' => $mimeType,
+                    'extension' => $extension
+                ]
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Profile image upload error: ' . $e->getMessage());
+            \Log::error('Stack trace: ' . $e->getTraceAsString());
+            return response()->json([
+                'message' => 'The profile image failed to upload.',
+                'error' => $e->getMessage()
+            ], 500);
         }
-        
-        // Store in temporary file with proper extension
-        $tempPath = storage_path('app/temp/' . $tempId . '.' . $extension);
-        
-        // Ensure temp directory exists
-        if (!file_exists(dirname($tempPath))) {
-            mkdir(dirname($tempPath), 0755, true);
-        }
-        
-        // Save the image to temporary file
-        file_put_contents($tempPath, $imageData);
-        
-        return response()->json([
-            'message' => 'Temporary profile image uploaded successfully',
-            'temp_id' => $tempId,
-            'image_url' => "/api/images/temp/{$tempId}"
-        ]);
     }
 
     /**
@@ -766,53 +942,91 @@ class ImageController extends Controller
     public function moveTempProfileImage(Request $request)
     {
         try {
+            \Log::info('moveTempProfileImage called');
+            \Log::info('Request data: ' . json_encode($request->all()));
+            
             $request->validate([
                 'temp_id' => 'required|string'
             ]);
 
             $tempId = $request->input('temp_id');
+            \Log::info('Temp ID: ' . $tempId);
             
             // Try to find the temporary file with any extension
             $tempDir = storage_path('app/temp/');
             $tempFiles = glob($tempDir . $tempId . '.*');
             
             if (empty($tempFiles)) {
-                return response()->json(['error' => 'Temporary image file not found', 'temp_id' => $tempId], 404);
+                \Log::error('Temporary image file not found for temp_id: ' . $tempId);
+                return response()->json(['error' => 'Temporary image file not found', 'temp_id' => $tempId, 'path' => $tempDir], 404);
             }
             
             $tempPath = $tempFiles[0]; // Use the first matching file
+            \Log::info('Found temporary file: ' . $tempPath);
             
             // Get the temporary image from file
             if (!file_exists($tempPath)) {
+                \Log::error('Temporary image file does not exist: ' . $tempPath);
                 return response()->json(['error' => 'Temporary image file not found', 'temp_id' => $tempId], 404);
             }
             
             $imageData = file_get_contents($tempPath);
             
             if (!$imageData) {
+                \Log::error('Temporary image data is empty for temp_id: ' . $tempId);
                 return response()->json(['error' => 'Temporary image data is empty', 'temp_id' => $tempId], 404);
             }
 
+            \Log::info('Image data loaded successfully - Size: ' . strlen($imageData) . ' bytes');
+
             // Get the authenticated user
             $user = auth()->user();
+            \Log::info('User found: ' . $user->id . ' - ' . $user->email);
             
             // Set the profile image blob
             $user->setProfileImageBlob($imageData);
+            \Log::info('setProfileImageBlob called successfully');
             
             // Also set the profile_image field with the URL
             $user->profile_image = "/api/images/user/{$user->id}/profile";
+            \Log::info('profile_image URL set to: ' . $user->profile_image);
             
-            $user->save();
+            // Save the user
+            $saved = $user->save();
+            \Log::info('User save result: ' . ($saved ? 'true' : 'false'));
+            
+            // Verify the image was saved
+            $user->refresh();
+            $finalBlobSize = $user->profile_image_blob ? strlen($user->profile_image_blob) : 0;
+            \Log::info('Final profile_image_blob size: ' . $finalBlobSize);
+            \Log::info('Final profile_image URL: ' . $user->profile_image);
+            
+            if ($finalBlobSize === 0) {
+                \Log::error('Profile image blob was not saved properly');
+                return response()->json([
+                    'error' => 'Failed to save profile image to database',
+                    'temp_id' => $tempId,
+                    'image_size' => strlen($imageData)
+                ], 500);
+            }
             
             // Remove the temporary file
             if (file_exists($tempPath)) {
                 unlink($tempPath);
+                \Log::info('Temporary file deleted: ' . $tempPath);
             }
             
             return response()->json([
                 'message' => 'Profile image updated successfully',
                 'user_id' => $user->id,
-                'image_url' => "/api/images/user/{$user->id}/profile"
+                'image_url' => "/api/images/user/{$user->id}/profile",
+                'debug' => [
+                    'temp_id' => $tempId,
+                    'image_size' => strlen($imageData),
+                    'final_blob_size' => $finalBlobSize,
+                    'temp_file_deleted' => !file_exists($tempPath),
+                    'profile_image_url' => $user->profile_image,
+                ]
             ]);
         } catch (\Exception $e) {
             \Log::error('Error in moveTempProfileImage: ' . $e->getMessage());
