@@ -138,20 +138,9 @@
             @endforeach
         </div>
 
-        <div class="warning">
-            <strong>⚠️ Important:</strong> 
-            <ul>
-                <li>All documents must be properly scanned or photographed in clear, readable format</li>
-                <li>Incomplete or unclear documents may delay your store approval process</li>
-                <li>You cannot log in to the app until your account is approved by an admin</li>
-                <li>Please visit the Hani App desktop application in <strong>{{ $store->state }}</strong> to submit your documents</li>
-            </ul>
-        </div>
+       
 
-        <div class="info">
-            <h4>📍 Where to Submit Documents:</h4>
-            <p>You must visit the <strong>Hani App desktop application</strong> located in <strong>{{ $store->state }}</strong> to submit your documents and complete the verification process. This cannot be done through the mobile app.</p>
-        </div>
+       
 
         <p>If you have any questions about the registration process, please contact the Hani App support team.</p>
 
