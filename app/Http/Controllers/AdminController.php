@@ -13,6 +13,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 
 class AdminController extends Controller
 {
@@ -403,6 +404,9 @@ class AdminController extends Controller
                 'approved_at' => $request->is_approved ? now() : null
             ]);
 
+            // Get the store owner
+            $storeOwner = User::find($storeModel->user_id);
+
             // Send notification to store owner
             if ($request->has('reason')) {
                 Notification::create([
@@ -414,6 +418,15 @@ class AdminController extends Controller
                     'priority' => $request->is_approved ? 'normal' : 'high',
                     'is_read' => false
                 ]);
+            }
+
+            // Send email notification
+            if ($storeOwner && $request->is_approved) {
+                try {
+                    Mail::to($storeOwner->email)->send(new \App\Mail\StoreApprovedMail($storeOwner, $storeModel));
+                } catch (\Exception $e) {
+                    \Log::error("Failed to send store approval email to: {$storeOwner->email}, Error: " . $e->getMessage());
+                }
             }
 
             return response()->json([
@@ -498,6 +511,16 @@ class AdminController extends Controller
             ];
 
             $store = Store::create($payload);
+
+            // Send approval email to store owner since admin-created stores are auto-approved
+            $storeOwner = User::find($store->user_id);
+            if ($storeOwner) {
+                try {
+                    Mail::to($storeOwner->email)->send(new \App\Mail\StoreApprovedMail($storeOwner, $store));
+                } catch (\Exception $e) {
+                    \Log::error("Failed to send store approval email to: {$storeOwner->email}, Error: " . $e->getMessage());
+                }
+            }
 
             return response()->json([
                 'message' => 'Store created successfully',
@@ -698,11 +721,24 @@ class AdminController extends Controller
                 ], 404);
             }
 
+            $wasApproved = $storeModel->is_approved;
             $storeModel->update([
                 'is_approved' => !$storeModel->is_approved,
                 'approved_at' => !$storeModel->is_approved ? now() : null,
                 'approved_by' => !$storeModel->is_approved ? auth()->id() : null,
             ]);
+
+            // Send email notification if store was just approved
+            if (!$wasApproved && $storeModel->is_approved) {
+                $storeOwner = User::find($storeModel->user_id);
+                if ($storeOwner) {
+                    try {
+                        Mail::to($storeOwner->email)->send(new \App\Mail\StoreApprovedMail($storeOwner, $storeModel));
+                    } catch (\Exception $e) {
+                        \Log::error("Failed to send store approval email to: {$storeOwner->email}, Error: " . $e->getMessage());
+                    }
+                }
+            }
 
             return response()->json([
                 'message' => $storeModel->is_approved ? 'Store approved successfully' : 'Store disapproved successfully',
