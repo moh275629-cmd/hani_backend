@@ -796,6 +796,7 @@ class ImageController extends Controller
             $finalBlobSize = $user->profile_image_blob ? strlen($user->profile_image_blob) : 0;
             \Log::info('Final profile_image_blob size: ' . $finalBlobSize);
             \Log::info('Final profile_image URL: ' . $user->profile_image);
+            \Log::info('User profile_image field value: ' . ($user->profile_image ?? 'null'));
             
             if ($finalBlobSize === 0) {
                 \Log::error('Profile image blob was not saved properly');
@@ -853,7 +854,7 @@ class ImageController extends Controller
                 ], 422);
             }
 
-            $imageFile = $request->file('image');
+        $imageFile = $request->file('image');
             
             // Debug file details
             \Log::info('Manual validation - File size: ' . $imageFile->getSize() . ' bytes');
@@ -884,38 +885,38 @@ class ImageController extends Controller
                 ], 422);
             }
             
-            $imageData = file_get_contents($imageFile->getRealPath());
-            
-            // Generate a temporary ID
-            $tempId = 'temp_profile_' . uniqid();
-            
-            // Determine file extension based on MIME type
-            $extension = 'jpg'; // default
-            
-            if ($mimeType === 'image/png') {
-                $extension = 'png';
-            } elseif ($mimeType === 'image/gif') {
-                $extension = 'gif';
-            } elseif ($mimeType === 'image/webp') {
-                $extension = 'webp';
+        $imageData = file_get_contents($imageFile->getRealPath());
+        
+        // Generate a temporary ID
+        $tempId = 'temp_profile_' . uniqid();
+        
+        // Determine file extension based on MIME type
+        $extension = 'jpg'; // default
+        
+        if ($mimeType === 'image/png') {
+            $extension = 'png';
+        } elseif ($mimeType === 'image/gif') {
+            $extension = 'gif';
+        } elseif ($mimeType === 'image/webp') {
+            $extension = 'webp';
             } elseif ($mimeType === 'image/bmp') {
                 $extension = 'bmp';
-            }
-            
-            // Store in temporary file with proper extension
-            $tempPath = storage_path('app/temp/' . $tempId . '.' . $extension);
-            
-            // Ensure temp directory exists
-            if (!file_exists(dirname($tempPath))) {
-                mkdir(dirname($tempPath), 0755, true);
-            }
-            
-            // Save the image to temporary file
-            file_put_contents($tempPath, $imageData);
-            
-            return response()->json([
-                'message' => 'Temporary profile image uploaded successfully',
-                'temp_id' => $tempId,
+        }
+        
+        // Store in temporary file with proper extension
+        $tempPath = storage_path('app/temp/' . $tempId . '.' . $extension);
+        
+        // Ensure temp directory exists
+        if (!file_exists(dirname($tempPath))) {
+            mkdir(dirname($tempPath), 0755, true);
+        }
+        
+        // Save the image to temporary file
+        file_put_contents($tempPath, $imageData);
+        
+        return response()->json([
+            'message' => 'Temporary profile image uploaded successfully',
+            'temp_id' => $tempId,
                 'image_url' => "/api/images/temp/{$tempId}",
                 'debug' => [
                     'temp_path' => $tempPath,

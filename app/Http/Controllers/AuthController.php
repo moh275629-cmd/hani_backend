@@ -419,6 +419,7 @@ class AuthController extends Controller
             $user = $request->user();
             
             \Log::info('User retrieved successfully: ' . $user->email);
+            \Log::info('User profile_image: ' . ($user->profile_image ?? 'null'));
             
             // Simple test response first
             $response = [
@@ -430,6 +431,8 @@ class AuthController extends Controller
                     'phone' => $user->phone,
                     'role' => $user->role,
                     'state' => $user->state,
+                    'state_code' => $user->state_code,
+                    'profile_image' => $user->profile_image,
                     'is_active' => $user->is_active,
                 ],
                 'loyalty_card' => null,
