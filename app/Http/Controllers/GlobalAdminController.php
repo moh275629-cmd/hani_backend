@@ -19,7 +19,7 @@ class GlobalAdminController extends Controller
     public function admins(Request $request): JsonResponse
     {
         try {
-            $query = User::whereIn('role', ['admin', 'global_admin']);
+            $query = User::query();
 
             // Apply filters
             if ($request->has('search')) {
@@ -28,7 +28,28 @@ class GlobalAdminController extends Controller
             }
 
             if ($request->has('role')) {
-                $query->where('role', $request->role);
+                // roles are encrypted; filter after decryption by ids
+                $role = $request->role;
+                $all = User::all();
+                $matchingIds = $all->filter(function($u) use ($role) {
+                    try { return (string) $u->role === (string) $role; } catch (\Exception $e) { return false; }
+                })->pluck('id');
+                if ($matchingIds->isNotEmpty()) {
+                    $query->whereIn('id', $matchingIds);
+                } else {
+                    $query->whereRaw('1 = 0');
+                }
+            } else {
+                // Default to admins and global_admins via decrypted values
+                $all = User::all();
+                $matchingIds = $all->filter(function($u) {
+                    try { return in_array($u->role, ['admin','global_admin'], true); } catch (\Exception $e) { return false; }
+                })->pluck('id');
+                if ($matchingIds->isNotEmpty()) {
+                    $query->whereIn('id', $matchingIds);
+                } else {
+                    $query->whereRaw('1 = 0');
+                }
             }
 
             if ($request->has('status')) {

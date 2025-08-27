@@ -78,7 +78,21 @@ class AdminController extends Controller
             // Apply role-based filtering
             if ($currentUser->isAdmin() && !$currentUser->isGlobalAdmin()) {
                 // Regional admin can only see users from their state
-                $query->where('state', $currentUser->state);
+                // State is encrypted, so we must filter by IDs after decrypting values
+                $allUsers = User::all();
+                $matchingIds = $allUsers->filter(function ($u) use ($currentUser) {
+                    try {
+                        return (string) $u->state === (string) $currentUser->state;
+                    } catch (\Exception $e) {
+                        return false;
+                    }
+                })->pluck('id');
+                if ($matchingIds->isNotEmpty()) {
+                    $query->whereIn('id', $matchingIds);
+                } else {
+                    // Ensure no results if nothing matches
+                    $query->whereRaw('1 = 0');
+                }
             }
             // Global admin can see all users
 
@@ -97,9 +111,21 @@ class AdminController extends Controller
             }
 
             if ($request->has('state')) {
-                $query->where(function($q) use ($request) {
-                    $q->where('state', $request->state);
-                });
+                // Filter by decrypted state value due to encryption
+                $requestedState = $request->state;
+                $allUsers = User::all();
+                $matchingIds = $allUsers->filter(function ($u) use ($requestedState) {
+                    try {
+                        return (string) $u->state === (string) $requestedState;
+                    } catch (\Exception $e) {
+                        return false;
+                    }
+                })->pluck('id');
+                if ($matchingIds->isNotEmpty()) {
+                    $query->whereIn('id', $matchingIds);
+                } else {
+                    $query->whereRaw('1 = 0');
+                }
             }
 
             $users = $query->paginate($request->get('per_page', 15));
