@@ -284,3 +284,85 @@ Route::get('/test-offer-image', function () {
         ], 500);
     }
 });
+
+Route::post('/test-png-upload', function (Request $request) {
+    try {
+        \Log::info('test-png-upload called');
+        \Log::info('Request has files: ' . $request->hasFile('image'));
+        \Log::info('Request files count: ' . count($request->allFiles()));
+        \Log::info('Request content type: ' . $request->header('Content-Type'));
+        \Log::info('Request content length: ' . $request->header('Content-Length'));
+        
+        // Debug all request data
+        \Log::info('All request data: ' . json_encode($request->all()));
+        \Log::info('All files: ' . json_encode($request->allFiles()));
+        \Log::info('Request input: ' . json_encode($request->input()));
+        
+        // Debug PHP configuration
+        \Log::info('PHP upload_max_filesize: ' . ini_get('upload_max_filesize'));
+        \Log::info('PHP post_max_size: ' . ini_get('post_max_size'));
+        \Log::info('PHP max_file_uploads: ' . ini_get('max_file_uploads'));
+        
+        if ($request->hasFile('image')) {
+            $file = $request->file('image');
+            \Log::info('File details: ' . json_encode([
+                'original_name' => $file->getClientOriginalName(),
+                'size' => $file->getSize(),
+                'mime_type' => $file->getMimeType(),
+                'extension' => $file->getClientOriginalExtension(),
+                'is_valid' => $file->isValid(),
+                'error' => $file->getError(),
+            ]));
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'PNG file upload test successful',
+                'file_info' => [
+                    'name' => $file->getClientOriginalName(),
+                    'size' => $file->getSize(),
+                    'mime_type' => $file->getMimeType(),
+                    'extension' => $file->getClientOriginalExtension(),
+                    'is_valid' => $file->isValid(),
+                    'error' => $file->getError(),
+                ]
+            ]);
+        } else {
+            // Try alternative methods to detect the file
+            \Log::info('Trying alternative file detection methods...');
+            
+            // Check if there are any files at all
+            $allFiles = $request->allFiles();
+            \Log::info('All files in request: ' . json_encode($allFiles));
+            
+            // Check if the file might be in a different field name
+            foreach ($allFiles as $fieldName => $file) {
+                \Log::info("Found file in field '$fieldName': " . json_encode([
+                    'original_name' => $file->getClientOriginalName(),
+                    'size' => $file->getSize(),
+                    'mime_type' => $file->getMimeType(),
+                ]));
+            }
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'No file uploaded',
+                'request_info' => [
+                    'has_files' => $request->hasFile('image'),
+                    'files_count' => count($request->allFiles()),
+                    'content_type' => $request->header('Content-Type'),
+                    'content_length' => $request->header('Content-Length'),
+                    'all_files' => array_keys($allFiles),
+                    'request_data' => $request->all(),
+                ]
+            ], 400);
+        }
+    } catch (\Exception $e) {
+        \Log::error('Test PNG upload error: ' . $e->getMessage());
+        \Log::error('Stack trace: ' . $e->getTraceAsString());
+        return response()->json([
+            'success' => false,
+            'message' => 'Test PNG upload failed: ' . $e->getMessage(),
+            'error' => $e->getMessage()
+        ], 500);
+    }
+});
