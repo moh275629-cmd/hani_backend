@@ -64,7 +64,7 @@ class AuthController extends Controller
             'password' => Hash::make($request->password),
             'role' => $request->role,
             'state' => $request->state,
-            'is_active' => $request->role === 'store' ? false : true, // Store users start as inactive
+            'is_active' => false, // ALL users start as inactive (need OTP verification)
             'is_approved' => false, // Both store and client need approval
             'id_verified' => false, // Will be set to true after manual verification
         ]);
@@ -370,12 +370,21 @@ class AuthController extends Controller
                     $store = $store ?: \App\Models\Store::where('user_id', $user->id)->first();
                 }
                 
-                // Create authentication token
-                $token = $user->createToken('auth-token')->plainTextToken;
+                // Create authentication token only for approved users or non-client users
+                $token = null;
+                if ($user->role !== 'client' || $user->is_approved) {
+                    $token = $user->createToken('auth-token')->plainTextToken;
+                }
+                
+                // Prepare response message based on user role and approval status
+                $message = 'OTP verified successfully';
+                if ($user->role === 'client' && !$user->is_approved) {
+                    $message = 'Email verified successfully. Your account is pending admin approval. Please wait for approval before logging in.';
+                }
                 
                 return response()->json([
                     'success' => true,
-                    'message' => 'OTP verified successfully',
+                    'message' => $message,
                     'user' => [
                         'id' => $user->id,
                         'name' => $user->name,
@@ -384,9 +393,11 @@ class AuthController extends Controller
                         'role' => $user->role,
                         'state' => $user->state,
                         'is_active' => $user->is_active,
+                        'is_approved' => $user->is_approved,
                     ],
                     'store' => $store,
                     'token' => $token,
+                    'requires_approval' => $user->role === 'client' && !$user->is_approved,
                 ]);
             }
 
