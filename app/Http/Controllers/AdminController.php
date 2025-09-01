@@ -1134,6 +1134,13 @@ class AdminController extends Controller
                 });
             }
 
+            // Apply state filter for global admin if requested
+            if ($currentUser->isGlobalAdmin() && $request->has('state') && $request->state !== 'all') {
+                $query->whereHas('reportedUser', function ($q) use ($request) {
+                    $q->where('state', $request->state);
+                });
+            }
+
             // Apply filters
             if ($request->has('status')) {
                 $query->where('status', $request->status);
