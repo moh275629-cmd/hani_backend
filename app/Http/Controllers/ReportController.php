@@ -72,7 +72,7 @@ class ReportController extends Controller
     {
         $admin = Auth::user();
         
-        if (!$admin->isAdmin()) {
+        if (!$admin->isAdmin() && !$admin->isGlobalAdmin()) {
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthorized'

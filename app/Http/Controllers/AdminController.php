@@ -1117,7 +1117,7 @@ class AdminController extends Controller
         try {
             $currentUser = auth()->user();
             
-            if (!$currentUser->isAdmin()) {
+            if (!$currentUser->isAdmin() && !$currentUser->isGlobalAdmin()) {
                 return response()->json([
                     'message' => 'Unauthorized',
                     'error' => 'Only admins can access reports'
@@ -1165,7 +1165,7 @@ class AdminController extends Controller
         try {
             $currentUser = auth()->user();
             
-            if (!$currentUser->isAdmin()) {
+            if (!$currentUser->isAdmin() && !$currentUser->isGlobalAdmin()) {
                 return response()->json([
                     'message' => 'Unauthorized',
                     'error' => 'Only admins can access expired accounts'
@@ -1208,7 +1208,7 @@ class AdminController extends Controller
         try {
             $currentUser = auth()->user();
             
-            if (!$currentUser->isAdmin()) {
+            if (!$currentUser->isAdmin() && !$currentUser->isGlobalAdmin()) {
                 return response()->json([
                     'message' => 'Unauthorized',
                     'error' => 'Only admins can access expiring accounts'
@@ -1327,7 +1327,7 @@ class AdminController extends Controller
         try {
             $currentUser = auth()->user();
             
-            if (!$currentUser->isAdmin()) {
+            if (!$currentUser->isAdmin() && !$currentUser->isGlobalAdmin()) {
                 return response()->json([
                     'message' => 'Unauthorized',
                     'error' => 'Only admins can approve clients'
