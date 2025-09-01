@@ -104,7 +104,34 @@ class AdminController extends Controller
             }
 
             if ($request->has('state')) {
-                $query->where('state', $request->state);
+                // Since state is encrypted, we need to filter after decryption
+                $allUsers = $query->get();
+                $filteredUsers = $allUsers->filter(function ($user) use ($request) {
+                    return $user->state === $request->state;
+                });
+                
+                // Return filtered results with pagination
+                $perPage = $request->get('per_page', 15);
+                $page = $request->get('page', 1);
+                $total = $filteredUsers->count();
+                $offset = ($page - 1) * $perPage;
+                
+                $paginatedUsers = $filteredUsers->slice($offset, $perPage);
+                
+                $data = [
+                    'data' => $paginatedUsers->values(),
+                    'current_page' => $page,
+                    'per_page' => $perPage,
+                    'total' => $total,
+                    'last_page' => ceil($total / $perPage),
+                    'from' => $offset + 1,
+                    'to' => min($offset + $perPage, $total),
+                ];
+
+                return response()->json([
+                    'message' => 'Users retrieved successfully',
+                    'data' => $data
+                ]);
             }
 
             $users = $query->paginate($request->get('per_page', 15));
@@ -295,7 +322,7 @@ class AdminController extends Controller
 
             // Apply role-based filtering
             if ($currentUser->isAdmin() && !$currentUser->isGlobalAdmin()) {
-                // Local admin can only see stores whose owner is in their state
+                // Local admin can only see stores whose owner is in same state
                 $query->whereHas('owner', function($q) use ($currentUser) {
                     $q->where('state', $currentUser->state);
                 });
@@ -317,7 +344,34 @@ class AdminController extends Controller
             }
 
             if ($request->has('state')) {
-                $query->where('state', $request->state);
+                // Since state is encrypted, we need to filter after decryption
+                $allStores = $query->get();
+                $filteredStores = $allStores->filter(function ($store) use ($request) {
+                    return $store->state === $request->state;
+                });
+                
+                // Return filtered results with pagination
+                $perPage = $request->get('per_page', 15);
+                $page = $request->get('page', 1);
+                $total = $filteredStores->count();
+                $offset = ($page - 1) * $perPage;
+                
+                $paginatedStores = $filteredStores->slice($offset, $perPage);
+                
+                $data = [
+                    'data' => $paginatedStores->values(),
+                    'current_page' => $page,
+                    'per_page' => $perPage,
+                    'total' => $total,
+                    'last_page' => ceil($total / $perPage),
+                    'from' => $offset + 1,
+                    'to' => min($offset + $perPage, $total),
+                ];
+
+                return response()->json([
+                    'message' => 'Stores retrieved successfully',
+                    'data' => $data
+                ]);
             }
 
             $stores = $query->paginate($request->get('per_page', 15));
@@ -1136,9 +1190,46 @@ class AdminController extends Controller
 
             // Apply state filter for global admin if requested
             if ($currentUser->isGlobalAdmin() && $request->has('state') && $request->state !== 'all') {
-                $query->whereHas('reportedUser', function ($q) use ($request) {
-                    $q->where('state', $request->state);
+                // Since state is encrypted, we need to filter after decryption
+                $allReports = $query->get();
+                $filteredReports = $allReports->filter(function ($report) use ($request) {
+                    return $report->reportedUser && $report->reportedUser->state === $request->state;
                 });
+                
+                // Return filtered results with pagination
+                $perPage = $request->get('per_page', 20);
+                $page = $request->get('page', 1);
+                $total = $filteredReports->count();
+                $offset = ($page - 1) * $perPage;
+                
+                $paginatedReports = $filteredReports->slice($offset, $perPage);
+                
+                // Transform the data to include store information
+                $paginatedReports->transform(function ($report) {
+                    $reportData = $report->toArray();
+                    
+                    // Add store information if the reported user has stores
+                    if ($report->reportedUser && $report->reportedUser->stores->isNotEmpty()) {
+                        $reportData['reported_store'] = $report->reportedUser->stores->first()->toArray();
+                    }
+                    
+                    return $reportData;
+                });
+                
+                $data = [
+                    'data' => $paginatedReports->values(),
+                    'current_page' => $page,
+                    'per_page' => $perPage,
+                    'total' => $total,
+                    'last_page' => ceil($total / $perPage),
+                    'from' => $offset + 1,
+                    'to' => min($offset + $perPage, $total),
+                ];
+
+                return response()->json([
+                    'message' => 'Reports retrieved successfully',
+                    'data' => $data
+                ]);
             }
 
             // Apply filters
@@ -1296,13 +1387,27 @@ class AdminController extends Controller
                 $query->where('state', $currentUser->state);
             }
 
-            // Get all users and filter in PHP for pending clients
-            $users = $query->get();
-            
-            // Filter for clients that are not approved
-            $pendingClients = $users->filter(function ($user) {
-                return $user->role === 'client' && !$user->is_approved;
-            })->values();
+            // Apply state filter for global admin if requested
+            if ($currentUser->isGlobalAdmin() && $request->has('state') && $request->state !== 'all') {
+                // Since state is encrypted, we need to filter after decryption
+                $allUsers = $query->get();
+                $filteredUsers = $allUsers->filter(function ($user) use ($request) {
+                    return $user->state === $request->state;
+                });
+                
+                // Filter for clients that are not approved
+                $pendingClients = $filteredUsers->filter(function ($user) {
+                    return $user->role === 'client' && !$user->is_approved;
+                })->values();
+            } else {
+                // Get all users and filter in PHP for pending clients
+                $users = $query->get();
+                
+                // Filter for clients that are not approved
+                $pendingClients = $users->filter(function ($user) {
+                    return $user->role === 'client' && !$user->is_approved;
+                })->values();
+            }
 
             // Apply pagination manually
             $perPage = $request->get('per_page', 20);
