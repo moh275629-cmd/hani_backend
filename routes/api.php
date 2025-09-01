@@ -14,6 +14,8 @@ use App\Http\Controllers\GlobalAdminController;
 use App\Http\Controllers\ImageController;
 use App\Http\Controllers\RatingController;
 use App\Http\Controllers\OfferRatingController;
+use App\Http\Controllers\ReportController;
+use App\Http\Controllers\ActivationController;
 
 // Public routes
 Route::post('/register', [AuthController::class, 'register']);
@@ -162,6 +164,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/rate/user/{id}', [RatingController::class, 'rateUser']);
     Route::get('/ratings/user/{id}', [RatingController::class, 'getUserRatings']);
     
+    // Reports
+    Route::post('/reports', [ReportController::class, 'store']);
+    Route::get('/reports', [ReportController::class, 'getUserReports']);
+    
     // Offer Ratings
     Route::post('/rate/offer/{id}', [OfferRatingController::class, 'rateOffer']);
     Route::get('/ratings/offer/{id}', [OfferRatingController::class, 'getOfferRatings']);
@@ -205,6 +211,20 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/offers/{offer}', [AdminController::class, 'updateOffer']);
         Route::delete('/offers/{offer}', [AdminController::class, 'deleteOffer']);
         Route::get('/analytics', [AdminController::class, 'analytics']);
+        
+        // Reports Management
+        Route::get('/reports', [AdminController::class, 'getReports']);
+        Route::put('/reports/{id}/status', [ReportController::class, 'updateStatus']);
+        
+        // Expired Accounts Management
+        Route::get('/expired-accounts', [AdminController::class, 'getExpiredAccounts']);
+        Route::get('/expiring-soon', [AdminController::class, 'getExpiringSoon']);
+        Route::post('/expired-accounts/{userId}/reactivate', [ActivationController::class, 'reactivateAccount']);
+        Route::post('/expired-accounts/{userId}/extend', [ActivationController::class, 'extendActivation']);
+        Route::post('/expired-accounts/{userId}/deactivate', [ActivationController::class, 'deactivateAccount']);
+        
+        // Client Approval
+        Route::post('/clients/{userId}/approve', [AdminController::class, 'approveClient']);
         
         // Store Edit Request Management
         Route::get('/store-edit-requests', [App\Http\Controllers\EditStoreController::class, 'adminIndex']);

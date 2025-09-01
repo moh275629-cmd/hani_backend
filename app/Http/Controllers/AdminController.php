@@ -9,6 +9,8 @@ use App\Models\Offer;
 use App\Models\Purchase;
 use App\Models\LoyaltyCard;
 use App\Models\Notification;
+use App\Models\Report;
+use App\Models\Activation;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
@@ -79,21 +81,10 @@ class AdminController extends Controller
             // Apply role-based filtering
             if ($currentUser->isAdmin() && !$currentUser->isGlobalAdmin()) {
                 // Regional admin can only see users from their state
-                // State is encrypted, so we must filter by IDs after decrypting values
-                $allUsers = User::all();
-                $matchingIds = $allUsers->filter(function ($u) use ($currentUser) {
-                    try {
-                        return (string) $u->state === (string) $currentUser->state;
-                    } catch (\Exception $e) {
-                        return false;
-                    }
-                })->pluck('id');
-                if ($matchingIds->isNotEmpty()) {
-                    $query->whereIn('id', $matchingIds);
-                } else {
-                    // Ensure no results if nothing matches
-                    $query->whereRaw('1 = 0');
-                }
+                // Use whereHas with a closure to handle encrypted fields
+                $query->where(function($q) use ($currentUser) {
+                    $q->where('state', $currentUser->state);
+                });
             }
             // Global admin can see all users
 
@@ -112,21 +103,7 @@ class AdminController extends Controller
             }
 
             if ($request->has('state')) {
-                // Filter by decrypted state value due to encryption
-                $requestedState = $request->state;
-                $allUsers = User::all();
-                $matchingIds = $allUsers->filter(function ($u) use ($requestedState) {
-                    try {
-                        return (string) $u->state === (string) $requestedState;
-                    } catch (\Exception $e) {
-                        return false;
-                    }
-                })->pluck('id');
-                if ($matchingIds->isNotEmpty()) {
-                    $query->whereIn('id', $matchingIds);
-                } else {
-                    $query->whereRaw('1 = 0');
-                }
+                $query->where('state', $request->state);
             }
 
             $users = $query->paginate($request->get('per_page', 15));
@@ -1130,5 +1107,207 @@ class AdminController extends Controller
             ->limit(10)
             ->get()
             ->toArray();
+    }
+
+    /**
+     * Get reports for admin (filtered by wilaya)
+     */
+    public function getReports(Request $request): JsonResponse
+    {
+        try {
+            $currentUser = auth()->user();
+            
+            if (!$currentUser->isAdmin()) {
+                return response()->json([
+                    'message' => 'Unauthorized',
+                    'error' => 'Only admins can access reports'
+                ], 403);
+            }
+
+            $query = Report::with(['reporter', 'reportedUser'])
+                ->whereHas('reportedUser', function ($q) use ($currentUser) {
+                    $q->where('state', $currentUser->state);
+                });
+
+            // Apply filters
+            if ($request->has('status')) {
+                $query->where('status', $request->status);
+            }
+
+            if ($request->has('date_from')) {
+                $query->where('created_at', '>=', $request->date_from);
+            }
+
+            if ($request->has('date_to')) {
+                $query->where('created_at', '<=', $request->date_to);
+            }
+
+            $reports = $query->orderBy('created_at', 'desc')->paginate(20);
+
+            return response()->json([
+                'message' => 'Reports retrieved successfully',
+                'data' => $reports
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Error retrieving reports',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get expired accounts for admin
+     */
+    public function getExpiredAccounts(Request $request): JsonResponse
+    {
+        try {
+            $currentUser = auth()->user();
+            
+            if (!$currentUser->isAdmin()) {
+                return response()->json([
+                    'message' => 'Unauthorized',
+                    'error' => 'Only admins can access expired accounts'
+                ], 403);
+            }
+
+            $query = Activation::with(['user'])
+                ->expired()
+                ->whereHas('user', function ($q) use ($currentUser) {
+                    $q->where('state', $currentUser->state);
+                });
+
+            // Filter by role
+            if ($request->has('role')) {
+                $query->whereHas('user', function ($q) use ($request) {
+                    $q->where('role', $request->role);
+                });
+            }
+
+            $expiredAccounts = $query->orderBy('deactivate_at', 'desc')->paginate(20);
+
+            return response()->json([
+                'message' => 'Expired accounts retrieved successfully',
+                'data' => $expiredAccounts
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Error retrieving expired accounts',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get accounts expiring soon
+     */
+    public function getExpiringSoon(Request $request): JsonResponse
+    {
+        try {
+            $currentUser = auth()->user();
+            
+            if (!$currentUser->isAdmin()) {
+                return response()->json([
+                    'message' => 'Unauthorized',
+                    'error' => 'Only admins can access expiring accounts'
+                ], 403);
+            }
+
+            $days = $request->get('days', 7);
+            $query = Activation::with(['user'])
+                ->expiringSoon($days)
+                ->whereHas('user', function ($q) use ($currentUser) {
+                    $q->where('state', $currentUser->state);
+                });
+
+            // Filter by role
+            if ($request->has('role')) {
+                $query->whereHas('user', function ($q) use ($request) {
+                    $q->where('role', $request->role);
+                });
+            }
+
+            $expiringAccounts = $query->orderBy('deactivate_at', 'asc')->paginate(20);
+
+            return response()->json([
+                'message' => 'Expiring accounts retrieved successfully',
+                'data' => $expiringAccounts
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Error retrieving expiring accounts',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Approve client account
+     */
+    public function approveClient(Request $request, $userId): JsonResponse
+    {
+        try {
+            $currentUser = auth()->user();
+            
+            if (!$currentUser->isAdmin()) {
+                return response()->json([
+                    'message' => 'Unauthorized',
+                    'error' => 'Only admins can approve clients'
+                ], 403);
+            }
+
+            $user = User::findOrFail($userId);
+            
+            // Check if admin can access this user (wilaya restriction)
+            if ($user->state !== $currentUser->state) {
+                return response()->json([
+                    'message' => 'Unauthorized',
+                    'error' => 'You can only manage users from your wilaya'
+                ], 403);
+            }
+
+            if ($user->role !== 'client') {
+                return response()->json([
+                    'message' => 'Invalid user',
+                    'error' => 'Only client accounts can be approved'
+                ], 400);
+            }
+
+            $user->approve();
+
+            // Send approval email
+            $this->sendClientApprovalEmail($user);
+
+            return response()->json([
+                'message' => 'Client approved successfully',
+                'data' => $user->fresh()
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Error approving client',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Send client approval email
+     */
+    private function sendClientApprovalEmail(User $user): void
+    {
+        try {
+            Mail::send('emails.client-approved', ['user' => $user], function ($message) use ($user) {
+                $message->to($user->email, $user->name)
+                        ->subject('Your Hani Account Has Been Approved!');
+            });
+            
+            Log::info("Client approval email sent to: {$user->email}");
+        } catch (\Exception $e) {
+            Log::error("Failed to send client approval email to {$user->email}: " . $e->getMessage());
+        }
     }
 }

@@ -65,6 +65,7 @@ class AuthController extends Controller
             'role' => $request->role,
             'state' => $request->state,
             'is_active' => $request->role === 'store' ? false : true, // Store users start as inactive
+            'is_approved' => $request->role === 'store' ? false : false, // Both store and client need approval
             'id_verified' => false, // Will be set to true after manual verification
         ]);
         
@@ -160,6 +161,16 @@ class AuthController extends Controller
                     'requires_approval' => true
                 ], 403);
             }
+        }
+
+        // Check client approval
+        if ($user->role === 'client' && !$user->is_approved) {
+            Auth::logout();
+            return response()->json([
+                'success' => false,
+                'message' => 'Your client account is pending admin approval. Please wait for approval before logging in.',
+                'requires_approval' => true
+            ], 403);
         }
         $token = $user->createToken('auth-token')->plainTextToken;
 

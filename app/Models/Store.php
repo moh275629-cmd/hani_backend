@@ -134,12 +134,22 @@ class Store extends Model
         $this->is_approved = true;
         $this->approved_at = now();
         $this->save();
+        
+        // Also approve the user and set activation
+        if ($this->user) {
+            $this->user->approve();
+        }
     }
 
     public function reject()
     {
         $this->is_approved = false;
         $this->save();
+        
+        // Also reject the user
+        if ($this->user) {
+            $this->user->reject();
+        }
     }
 
     public function activate()
@@ -152,6 +162,11 @@ class Store extends Model
     {
         $this->is_active = false;
         $this->save();
+        
+        // Also deactivate the user
+        if ($this->user) {
+            $this->user->deactivate();
+        }
     }
 
     public function getAverageRating()

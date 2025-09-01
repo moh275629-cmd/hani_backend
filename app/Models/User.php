@@ -23,6 +23,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'state',
         'state_code',
         'is_active',
+        'is_approved',
         'email_verified_at',
         'phone_verified_at',
         'id_verification_data',
@@ -44,6 +45,7 @@ class User extends Authenticatable implements MustVerifyEmail
      
         'role',
         'state_code',
+        'is_approved',
       
     ];
 
@@ -53,6 +55,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'id_verified_at' => 'datetime',
         'password' => 'hashed',
         'is_active' => 'boolean',
+        'is_approved' => 'boolean',
         'id_verification_data' => 'array',
     ];
 
@@ -87,6 +90,21 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(Rating::class, 'ratee_id');
     }
 
+    public function reports()
+    {
+        return $this->hasMany(Report::class, 'reporter_id');
+    }
+
+    public function reportedReports()
+    {
+        return $this->hasMany(Report::class, 'reported_user_id');
+    }
+
+    public function activation()
+    {
+        return $this->hasOne(Activation::class);
+    }
+
     // Scopes
     public function scopeClients($query)
     {
@@ -113,6 +131,16 @@ class User extends Authenticatable implements MustVerifyEmail
         return $query->where('is_active', true);
     }
 
+    public function scopeApproved($query)
+    {
+        return $query->where('is_approved', true);
+    }
+
+    public function scopePendingApproval($query)
+    {
+        return $query->where('is_approved', false);
+    }
+
     // Methods
     public function isClient()
     {
@@ -137,6 +165,60 @@ class User extends Authenticatable implements MustVerifyEmail
     public function hasVerifiedPhone()
     {
         return !is_null($this->phone_verified_at);
+    }
+
+    public function isApproved()
+    {
+        return $this->is_approved;
+    }
+
+    public function approve()
+    {
+        $this->is_approved = true;
+        $this->save();
+        
+        // Create or update activation record
+        $this->activation()->updateOrCreate(
+            ['user_id' => $this->id],
+            [
+                'approved_at' => now(),
+                'deactivate_at' => now()->addYear(),
+            ]
+        );
+    }
+
+    public function reject()
+    {
+        $this->is_approved = false;
+        $this->save();
+    }
+
+    public function deactivate()
+    {
+        $this->is_active = false;
+        $this->is_approved = false;
+        $this->save();
+        
+        // Update activation record
+        if ($this->activation) {
+            $this->activation->deactivateNow();
+        }
+    }
+
+    public function reactivate($days = 365)
+    {
+        $this->is_active = true;
+        $this->is_approved = true;
+        $this->save();
+        
+        // Update activation record
+        $this->activation()->updateOrCreate(
+            ['user_id' => $this->id],
+            [
+                'approved_at' => now(),
+                'deactivate_at' => now()->addDays($days),
+            ]
+        );
     }
 
     public function markPhoneAsVerified()
