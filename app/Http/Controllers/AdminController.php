@@ -1252,7 +1252,7 @@ class AdminController extends Controller
         try {
             $currentUser = auth()->user();
             
-            if (!$currentUser->isAdmin()) {
+            if (!$currentUser->isAdmin() && !$currentUser->isGlobalAdmin()) {
                 return response()->json([
                     'message' => 'Unauthorized',
                     'error' => 'Only admins can view pending client approvals'

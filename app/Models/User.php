@@ -143,22 +143,50 @@ class User extends Authenticatable implements MustVerifyEmail
     // Methods
     public function isClient()
     {
-        return $this->role === 'client';
+        // Since role is encrypted, we need to decrypt it first
+        try {
+            $decryptedRole = $this->role;
+            return $decryptedRole === 'client';
+        } catch (\Exception $e) {
+            // If decryption fails, return false
+            return false;
+        }
     }
 
     public function isStore()
     {
-        return $this->role === 'store';
+        // Since role is encrypted, we need to decrypt it first
+        try {
+            $decryptedRole = $this->role;
+            return $decryptedRole === 'store';
+        } catch (\Exception $e) {
+            // If decryption fails, return false
+            return false;
+        }
     }
 
     public function isAdmin()
     {
-        return $this->role === 'admin';
+        // Since role is encrypted, we need to decrypt it first
+        try {
+            $decryptedRole = $this->role;
+            return $decryptedRole === 'admin';
+        } catch (\Exception $e) {
+            // If decryption fails, return false
+            return false;
+        }
     }
 
     public function isGlobalAdmin()
     {
-        return $this->role === 'global_admin';
+        // Since role is encrypted, we need to decrypt it first
+        try {
+            $decryptedRole = $this->role;
+            return $decryptedRole === 'global_admin';
+        } catch (\Exception $e) {
+            // If decryption fails, return false
+            return false;
+        }
     }
 
     public function hasVerifiedPhone()
