@@ -1125,7 +1125,7 @@ class AdminController extends Controller
                 ], 403);
             }
 
-            $query = Report::with(['reporter', 'reportedUser']);
+            $query = Report::with(['reporter', 'reportedUser', 'reportedUser.stores']);
             
             // Apply wilaya filtering only for regional admins, not global admins
             if ($currentUser->isAdmin() && !$currentUser->isGlobalAdmin()) {
@@ -1148,6 +1148,18 @@ class AdminController extends Controller
             }
 
             $reports = $query->orderBy('created_at', 'desc')->paginate(20);
+
+            // Transform the data to include store information
+            $reports->getCollection()->transform(function ($report) {
+                $reportData = $report->toArray();
+                
+                // Add store information if the reported user has stores
+                if ($report->reportedUser && $report->reportedUser->stores->isNotEmpty()) {
+                    $reportData['reported_store'] = $report->reportedUser->stores->first()->toArray();
+                }
+                
+                return $reportData;
+            });
 
             return response()->json([
                 'message' => 'Reports retrieved successfully',
