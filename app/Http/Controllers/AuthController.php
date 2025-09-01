@@ -71,9 +71,9 @@ class AuthController extends Controller
         
         
 
-        // Create authentication token only for non-store users
+        // Create authentication token only for admin users (clients and stores need approval)
         $token = null;
-        if ($request->role !== 'store') {
+        if ($request->role === 'admin') {
             $token = $user->createToken('auth-token')->plainTextToken;
         }
 
@@ -81,7 +81,7 @@ class AuthController extends Controller
             'success' => true,
             'message' => $request->role === 'store' 
                 ? 'Store registered successfully. Please verify your email and wait for admin approval.' 
-                : 'User registered successfully. Please verify your email.',
+                : 'Client registered successfully. Please wait for admin approval before logging in.',
             'user' => [
                 'id' => $user->id,
                 'name' => $user->name,
@@ -91,7 +91,7 @@ class AuthController extends Controller
                 'state' => $user->state,
             ],
             'token' => $token,
-            'requires_approval' => $request->role === 'store',
+            'requires_approval' => $request->role === 'store' || $request->role === 'client',
         ], 201);
     }
 
@@ -128,8 +128,15 @@ class AuthController extends Controller
 
         $user = Auth::user();
         
-     
-     
+        // Check client approval FIRST - clients cannot login without approval
+        if ($user->role === 'client' && !$user->is_approved) {
+            Auth::logout();
+            return response()->json([
+                'success' => false,
+                'message' => 'Your client account is pending admin approval. Please wait for approval before logging in.',
+                'requires_approval' => true
+            ], 403);
+        }
         
         // Don't allow login if user is not active - send OTP and redirect to verification
         if (!$user->is_active) {
@@ -163,15 +170,7 @@ class AuthController extends Controller
             }
         }
 
-        // Check client approval
-        if ($user->role === 'client' && !$user->is_approved) {
-            Auth::logout();
-            return response()->json([
-                'success' => false,
-                'message' => 'Your client account is pending admin approval. Please wait for approval before logging in.',
-                'requires_approval' => true
-            ], 403);
-        }
+        // Remove the duplicate client approval check since we already did it above
         $token = $user->createToken('auth-token')->plainTextToken;
 
         $response = [
