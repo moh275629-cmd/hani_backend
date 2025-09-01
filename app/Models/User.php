@@ -45,7 +45,6 @@ class User extends Authenticatable implements MustVerifyEmail
      
         'role',
         'state_code',
-        'is_approved',
       
     ];
 

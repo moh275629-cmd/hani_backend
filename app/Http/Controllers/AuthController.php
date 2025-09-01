@@ -65,7 +65,7 @@ class AuthController extends Controller
             'role' => $request->role,
             'state' => $request->state,
             'is_active' => $request->role === 'store' ? false : true, // Store users start as inactive
-            'is_approved' => $request->role === 'store' ? false : false, // Both store and client need approval
+            'is_approved' => false, // Both store and client need approval
             'id_verified' => false, // Will be set to true after manual verification
         ]);
         
