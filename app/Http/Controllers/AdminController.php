@@ -1110,7 +1110,7 @@ class AdminController extends Controller
     }
 
     /**
-     * Get reports for admin (filtered by wilaya)
+     * Get reports for admin (filtered by wilaya for regional admins)
      */
     public function getReports(Request $request): JsonResponse
     {
@@ -1124,10 +1124,14 @@ class AdminController extends Controller
                 ], 403);
             }
 
-            $query = Report::with(['reporter', 'reportedUser'])
-                ->whereHas('reportedUser', function ($q) use ($currentUser) {
+            $query = Report::with(['reporter', 'reportedUser']);
+            
+            // Apply wilaya filtering only for regional admins, not global admins
+            if ($currentUser->isAdmin() && !$currentUser->isGlobalAdmin()) {
+                $query->whereHas('reportedUser', function ($q) use ($currentUser) {
                     $q->where('state', $currentUser->state);
                 });
+            }
 
             // Apply filters
             if ($request->has('status')) {
@@ -1172,11 +1176,14 @@ class AdminController extends Controller
                 ], 403);
             }
 
-            $query = Activation::with(['user'])
-                ->expired()
-                ->whereHas('user', function ($q) use ($currentUser) {
+            $query = Activation::with(['user'])->expired();
+            
+            // Apply wilaya filtering only for regional admins, not global admins
+            if ($currentUser->isAdmin() && !$currentUser->isGlobalAdmin()) {
+                $query->whereHas('user', function ($q) use ($currentUser) {
                     $q->where('state', $currentUser->state);
                 });
+            }
 
             // Filter by role
             if ($request->has('role')) {
@@ -1216,11 +1223,14 @@ class AdminController extends Controller
             }
 
             $days = $request->get('days', 7);
-            $query = Activation::with(['user'])
-                ->expiringSoon($days)
-                ->whereHas('user', function ($q) use ($currentUser) {
+            $query = Activation::with(['user'])->expiringSoon($days);
+            
+            // Apply wilaya filtering only for regional admins, not global admins
+            if ($currentUser->isAdmin() && !$currentUser->isGlobalAdmin()) {
+                $query->whereHas('user', function ($q) use ($currentUser) {
                     $q->where('state', $currentUser->state);
                 });
+            }
 
             // Filter by role
             if ($request->has('role')) {
@@ -1261,7 +1271,7 @@ class AdminController extends Controller
 
             $query = User::query();
             
-            // Apply wilaya filtering for regional admins
+            // Apply wilaya filtering only for regional admins, not global admins
             if ($currentUser->isAdmin() && !$currentUser->isGlobalAdmin()) {
                 $query->where('state', $currentUser->state);
             }
@@ -1336,8 +1346,8 @@ class AdminController extends Controller
 
             $user = User::findOrFail($userId);
             
-            // Check if admin can access this user (wilaya restriction)
-            if ($user->state !== $currentUser->state) {
+            // Check if admin can access this user (wilaya restriction for regional admins only)
+            if ($currentUser->isAdmin() && !$currentUser->isGlobalAdmin() && $user->state !== $currentUser->state) {
                 return response()->json([
                     'message' => 'Unauthorized',
                     'error' => 'You can only manage users from your wilaya'
