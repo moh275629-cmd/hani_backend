@@ -224,6 +224,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/expired-accounts/{userId}/deactivate', [ActivationController::class, 'deactivateAccount']);
         
         // Client Approval
+        Route::get('/pending-client-approvals', [AdminController::class, 'getPendingClientApprovals']);
         Route::post('/clients/{userId}/approve', [AdminController::class, 'approveClient']);
         
         // Store Edit Request Management

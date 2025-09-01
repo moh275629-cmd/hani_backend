@@ -1245,6 +1245,81 @@ class AdminController extends Controller
     }
 
     /**
+     * Get pending client approvals
+     */
+    public function getPendingClientApprovals(Request $request): JsonResponse
+    {
+        try {
+            $currentUser = auth()->user();
+            
+            if (!$currentUser->isAdmin()) {
+                return response()->json([
+                    'message' => 'Unauthorized',
+                    'error' => 'Only admins can view pending client approvals'
+                ], 403);
+            }
+
+            $query = User::query();
+            
+            // Apply wilaya filtering for regional admins
+            if ($currentUser->isAdmin() && !$currentUser->isGlobalAdmin()) {
+                $query->where('state', $currentUser->state);
+            }
+
+            // Get all users and filter in PHP for pending clients
+            $users = $query->get();
+            
+            // Filter for clients that are not approved
+            $pendingClients = $users->filter(function ($user) {
+                return $user->role === 'client' && !$user->is_approved;
+            })->values();
+
+            // Apply pagination manually
+            $perPage = $request->get('per_page', 20);
+            $page = $request->get('page', 1);
+            $total = $pendingClients->count();
+            $offset = ($page - 1) * $perPage;
+            
+            $paginatedClients = $pendingClients->slice($offset, $perPage);
+            
+            $data = [
+                'data' => $paginatedClients->map(function ($user) {
+                    return [
+                        'id' => $user->id,
+                        'name' => $user->name,
+                        'email' => $user->email,
+                        'phone' => $user->phone,
+                        'role' => $user->role,
+                        'state' => $user->state,
+                        'is_active' => $user->is_active,
+                        'is_approved' => $user->is_approved,
+                        'created_at' => $user->created_at,
+                    ];
+                }),
+                'current_page' => $page,
+                'per_page' => $perPage,
+                'total' => $total,
+                'last_page' => ceil($total / $perPage),
+                'from' => $offset + 1,
+                'to' => min($offset + $perPage, $total),
+            ];
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Pending client approvals retrieved successfully',
+                'data' => $data
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error retrieving pending client approvals',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Approve client account
      */
     public function approveClient(Request $request, $userId): JsonResponse
