@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Log;
 
 class ReportController extends Controller
 {
@@ -172,7 +173,7 @@ class ReportController extends Controller
         $report = Report::findOrFail($id);
         
         // Check if admin can access this report (wilaya restriction)
-        if ($admin->isAdmin() && $report->reportedUser->state !== $admin->state) {
+        if ($admin->isAdmin() && !$admin->isGlobalAdmin() && $report->reportedUser->state !== $admin->state) {
             return response()->json([
                 'success' => false,
                 'message' => 'You can only manage reports from your wilaya'
@@ -186,21 +187,25 @@ class ReportController extends Controller
         $action = $request->action;
 
         // Take action based on admin decision
-        switch ($action) {
-            case 'close_account':
-                $reportedUser->deactivate();
-                break;
-            case 'warning':
-                // Send warning email
-                $this->sendWarningEmail($reportedUser, $request->notes);
-                break;
-            case 'let_go':
-                // No action needed, just resolve the report
-                break;
+        try {
+            switch ($action) {
+                case 'close_account':
+                    $reportedUser->deactivate();
+                    // Send email notification for account closure
+                    $this->sendReportActionEmail($reportedUser, $action, $request->notes);
+                    break;
+                case 'warning':
+                    // Send warning email
+                    $this->sendWarningEmail($reportedUser, $request->notes);
+                    break;
+                case 'let_go':
+                    // No action needed, no email sent for dismiss
+                    break;
+            }
+        } catch (\Exception $e) {
+            Log::error("Error taking action on report {$id}: " . $e->getMessage());
+            // Continue with the response even if action fails
         }
-
-        // Send email notification to reported user
-        $this->sendReportActionEmail($reportedUser, $action, $request->notes);
 
         return response()->json([
             'success' => true,

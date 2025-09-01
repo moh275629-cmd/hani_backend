@@ -1376,8 +1376,13 @@ class AdminController extends Controller
 
             $user->approve();
 
-            // Send approval email
-            $this->sendClientApprovalEmail($user);
+            // Send approval email (non-blocking)
+            try {
+                $this->sendClientApprovalEmail($user);
+            } catch (\Exception $e) {
+                Log::error("Email sending failed but client approval succeeded: " . $e->getMessage());
+                // Don't fail the approval if email fails
+            }
 
             return response()->json([
                 'message' => 'Client approved successfully',
@@ -1398,14 +1403,17 @@ class AdminController extends Controller
     private function sendClientApprovalEmail(User $user): void
     {
         try {
+            Log::info("Attempting to send client approval email to: {$user->email}");
+            
             Mail::send('emails.client-approved', ['user' => $user], function ($message) use ($user) {
                 $message->to($user->email, $user->name)
                         ->subject('Your Hani Account Has Been Approved!');
             });
             
-            Log::info("Client approval email sent to: {$user->email}");
+            Log::info("Client approval email sent successfully to: {$user->email}");
         } catch (\Exception $e) {
             Log::error("Failed to send client approval email to {$user->email}: " . $e->getMessage());
+            Log::error("Email error details: " . $e->getTraceAsString());
         }
     }
 }
