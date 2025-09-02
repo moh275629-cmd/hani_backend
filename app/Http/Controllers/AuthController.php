@@ -725,7 +725,7 @@ class AuthController extends Controller
     public function requestPasswordReset(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'email' => 'required|string|email|exists:users,email',
+            'email' => 'required|string|email',
         ]);
 
         if ($validator->fails()) {
