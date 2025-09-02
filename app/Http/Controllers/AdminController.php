@@ -79,16 +79,6 @@ class AdminController extends Controller
             $query = User::with(['loyaltyCards', 'stores']);
             $currentUser = auth()->user();
 
-            // Apply role-based filtering
-            if ($currentUser->isAdmin() && !$currentUser->isGlobalAdmin()) {
-                // Regional admin can only see users from their state
-                // Use whereHas with a closure to handle encrypted fields
-                $query->where(function($q) use ($currentUser) {
-                    $q->where('state', $currentUser->state);
-                });
-            }
-            // Global admin can see all users
-
             // Apply filters
             if ($request->has('search')) {
                 $search = $request->search;
@@ -103,42 +93,45 @@ class AdminController extends Controller
                 $query->where('is_active', $request->status === 'active');
             }
 
+            // Get all users first (since state is encrypted, we need to filter after decryption)
+            $allUsers = $query->get();
+            
+            // Apply role-based filtering after decryption
+            if ($currentUser->isAdmin() && !$currentUser->isGlobalAdmin()) {
+                // Regional admin can only see users from their state
+                $allUsers = $allUsers->filter(function ($user) use ($currentUser) {
+                    return $user->state === $currentUser->state;
+                });
+            }
+            
+            // Apply state filter if provided (for global admins)
             if ($request->has('state')) {
-                // Since state is encrypted, we need to filter after decryption
-                $allUsers = $query->get();
-                $filteredUsers = $allUsers->filter(function ($user) use ($request) {
+                $allUsers = $allUsers->filter(function ($user) use ($request) {
                     return $user->state === $request->state;
                 });
-                
-                // Return filtered results with pagination
-                $perPage = $request->get('per_page', 15);
-                $page = $request->get('page', 1);
-                $total = $filteredUsers->count();
-                $offset = ($page - 1) * $perPage;
-                
-                $paginatedUsers = $filteredUsers->slice($offset, $perPage);
-                
-                $data = [
-                    'data' => $paginatedUsers->values(),
-                    'current_page' => $page,
-                    'per_page' => $perPage,
-                    'total' => $total,
-                    'last_page' => ceil($total / $perPage),
-                    'from' => $offset + 1,
-                    'to' => min($offset + $perPage, $total),
-                ];
-
-                return response()->json([
-                    'message' => 'Users retrieved successfully',
-                    'data' => $data
-                ]);
             }
-
-            $users = $query->paginate($request->get('per_page', 15));
+            
+            // Apply pagination
+            $perPage = $request->get('per_page', 15);
+            $page = $request->get('page', 1);
+            $total = $allUsers->count();
+            $offset = ($page - 1) * $perPage;
+            
+            $paginatedUsers = $allUsers->slice($offset, $perPage);
+            
+            $data = [
+                'data' => $paginatedUsers->values(),
+                'current_page' => $page,
+                'per_page' => $perPage,
+                'total' => $total,
+                'last_page' => ceil($total / $perPage),
+                'from' => $offset + 1,
+                'to' => min($offset + $perPage, $total),
+            ];
 
             return response()->json([
                 'message' => 'Users retrieved successfully',
-                'data' => $users
+                'data' => $data
             ]);
 
         } catch (\Exception $e) {
@@ -320,15 +313,6 @@ class AdminController extends Controller
             $query = Store::with(['owner']);
             $currentUser = auth()->user();
 
-            // Apply role-based filtering
-            if ($currentUser->isAdmin() && !$currentUser->isGlobalAdmin()) {
-                // Local admin can only see stores whose owner is in same state
-                $query->whereHas('owner', function($q) use ($currentUser) {
-                    $q->where('state', $currentUser->state);
-                });
-            }
-            // Global admin can see all stores
-
             // Apply filters
             if ($request->has('search')) {
                 $search = $request->search;
@@ -343,42 +327,45 @@ class AdminController extends Controller
                 $query->where('business_type', $request->category);
             }
 
+            // Get all stores first (since state is encrypted, we need to filter after decryption)
+            $allStores = $query->get();
+            
+            // Apply role-based filtering after decryption
+            if ($currentUser->isAdmin() && !$currentUser->isGlobalAdmin()) {
+                // Local admin can only see stores whose owner is in same state
+                $allStores = $allStores->filter(function ($store) use ($currentUser) {
+                    return $store->owner && $store->owner->state === $currentUser->state;
+                });
+            }
+            
+            // Apply state filter if provided (for global admins)
             if ($request->has('state')) {
-                // Since state is encrypted, we need to filter after decryption
-                $allStores = $query->get();
-                $filteredStores = $allStores->filter(function ($store) use ($request) {
+                $allStores = $allStores->filter(function ($store) use ($request) {
                     return $store->state === $request->state;
                 });
-                
-                // Return filtered results with pagination
-                $perPage = $request->get('per_page', 15);
-                $page = $request->get('page', 1);
-                $total = $filteredStores->count();
-                $offset = ($page - 1) * $perPage;
-                
-                $paginatedStores = $filteredStores->slice($offset, $perPage);
-                
-                $data = [
-                    'data' => $paginatedStores->values(),
-                    'current_page' => $page,
-                    'per_page' => $perPage,
-                    'total' => $total,
-                    'last_page' => ceil($total / $perPage),
-                    'from' => $offset + 1,
-                    'to' => min($offset + $perPage, $total),
-                ];
-
-                return response()->json([
-                    'message' => 'Stores retrieved successfully',
-                    'data' => $data
-                ]);
             }
-
-            $stores = $query->paginate($request->get('per_page', 15));
+            
+            // Apply pagination
+            $perPage = $request->get('per_page', 15);
+            $page = $request->get('page', 1);
+            $total = $allStores->count();
+            $offset = ($page - 1) * $perPage;
+            
+            $paginatedStores = $allStores->slice($offset, $perPage);
+            
+            $data = [
+                'data' => $paginatedStores->values(),
+                'current_page' => $page,
+                'per_page' => $perPage,
+                'total' => $total,
+                'last_page' => ceil($total / $perPage),
+                'from' => $offset + 1,
+                'to' => min($offset + $perPage, $total),
+            ];
 
             return response()->json([
                 'message' => 'Stores retrieved successfully',
-                'data' => $stores
+                'data' => $data
             ]);
 
         } catch (\Exception $e) {
@@ -1179,76 +1166,56 @@ class AdminController extends Controller
                 ], 403);
             }
 
-            $query = Report::with(['reporter', 'reportedUser', 'reportedUser.stores']);
+            // Get all reports first (since state is encrypted, we need to filter after decryption)
+            $allReports = Report::with(['reporter', 'reportedUser', 'reportedUser.stores'])->get();
             
-            // Apply wilaya filtering only for regional admins, not global admins
+            // Apply role-based filtering after decryption
             if ($currentUser->isAdmin() && !$currentUser->isGlobalAdmin()) {
-                $query->whereHas('reportedUser', function ($q) use ($currentUser) {
-                    $q->where('state', $currentUser->state);
+                // Regional admin can only see reports from users in their state
+                $allReports = $allReports->filter(function ($report) use ($currentUser) {
+                    return $report->reportedUser && $report->reportedUser->state === $currentUser->state;
                 });
             }
-
+            
             // Apply state filter for global admin if requested
             if ($currentUser->isGlobalAdmin() && $request->has('state') && $request->state !== 'all') {
-                // Since state is encrypted, we need to filter after decryption
-                $allReports = $query->get();
-                $filteredReports = $allReports->filter(function ($report) use ($request) {
+                $allReports = $allReports->filter(function ($report) use ($request) {
                     return $report->reportedUser && $report->reportedUser->state === $request->state;
                 });
-                
-                // Return filtered results with pagination
-                $perPage = $request->get('per_page', 20);
-                $page = $request->get('page', 1);
-                $total = $filteredReports->count();
-                $offset = ($page - 1) * $perPage;
-                
-                $paginatedReports = $filteredReports->slice($offset, $perPage);
-                
-                // Transform the data to include store information
-                $paginatedReports->transform(function ($report) {
-                    $reportData = $report->toArray();
-                    
-                    // Add store information if the reported user has stores
-                    if ($report->reportedUser && $report->reportedUser->stores->isNotEmpty()) {
-                        $reportData['reported_store'] = $report->reportedUser->stores->first()->toArray();
-                    }
-                    
-                    return $reportData;
-                });
-                
-                $data = [
-                    'data' => $paginatedReports->values(),
-                    'current_page' => $page,
-                    'per_page' => $perPage,
-                    'total' => $total,
-                    'last_page' => ceil($total / $perPage),
-                    'from' => $offset + 1,
-                    'to' => min($offset + $perPage, $total),
-                ];
-
-                return response()->json([
-                    'message' => 'Reports retrieved successfully',
-                    'data' => $data
-                ]);
             }
-
+            
             // Apply filters
             if ($request->has('status')) {
-                $query->where('status', $request->status);
+                $allReports = $allReports->filter(function ($report) use ($request) {
+                    return $report->status === $request->status;
+                });
             }
 
             if ($request->has('date_from')) {
-                $query->where('created_at', '>=', $request->date_from);
+                $allReports = $allReports->filter(function ($report) use ($request) {
+                    return $report->created_at >= $request->date_from;
+                });
             }
 
             if ($request->has('date_to')) {
-                $query->where('created_at', '<=', $request->date_to);
+                $allReports = $allReports->filter(function ($report) use ($request) {
+                    return $report->created_at <= $request->date_to;
+                });
             }
-
-            $reports = $query->orderBy('created_at', 'desc')->paginate(20);
-
+            
+            // Sort by created_at desc
+            $allReports = $allReports->sortByDesc('created_at');
+            
+            // Apply pagination manually
+            $perPage = $request->get('per_page', 20);
+            $page = $request->get('page', 1);
+            $total = $allReports->count();
+            $offset = ($page - 1) * $perPage;
+            
+            $paginatedReports = $allReports->slice($offset, $perPage);
+            
             // Transform the data to include store information
-            $reports->getCollection()->transform(function ($report) {
+            $paginatedReports->transform(function ($report) {
                 $reportData = $report->toArray();
                 
                 // Add store information if the reported user has stores
@@ -1258,10 +1225,20 @@ class AdminController extends Controller
                 
                 return $reportData;
             });
+            
+            $data = [
+                'data' => $paginatedReports->values(),
+                'current_page' => $page,
+                'per_page' => $perPage,
+                'total' => $total,
+                'last_page' => ceil($total / $perPage),
+                'from' => $offset + 1,
+                'to' => min($offset + $perPage, $total),
+            ];
 
             return response()->json([
                 'message' => 'Reports retrieved successfully',
-                'data' => $reports
+                'data' => $data
             ]);
 
         } catch (\Exception $e) {
@@ -1287,27 +1264,55 @@ class AdminController extends Controller
                 ], 403);
             }
 
-            $query = Activation::with(['user'])->expired();
+            // Get all expired activations first (since state is encrypted, we need to filter after decryption)
+            $allActivations = Activation::with(['user'])->expired()->get();
             
-            // Apply wilaya filtering only for regional admins, not global admins
+            // Apply role-based filtering after decryption
             if ($currentUser->isAdmin() && !$currentUser->isGlobalAdmin()) {
-                $query->whereHas('user', function ($q) use ($currentUser) {
-                    $q->where('state', $currentUser->state);
+                // Regional admin can only see activations from users in their state
+                $allActivations = $allActivations->filter(function ($activation) use ($currentUser) {
+                    return $activation->user && $activation->user->state === $currentUser->state;
                 });
             }
-
+            
+            // Apply state filter for global admin if requested
+            if ($currentUser->isGlobalAdmin() && $request->has('state') && $request->state !== 'all') {
+                $allActivations = $allActivations->filter(function ($activation) use ($request) {
+                    return $activation->user && $activation->user->state === $request->state;
+                });
+            }
+            
             // Filter by role
             if ($request->has('role')) {
-                $query->whereHas('user', function ($q) use ($request) {
-                    $q->where('role', $request->role);
+                $allActivations = $allActivations->filter(function ($activation) use ($request) {
+                    return $activation->user && $activation->user->role === $request->role;
                 });
             }
-
-            $expiredAccounts = $query->orderBy('deactivate_at', 'desc')->paginate(20);
+            
+            // Sort by deactivate_at desc
+            $allActivations = $allActivations->sortByDesc('deactivate_at');
+            
+            // Apply pagination manually
+            $perPage = $request->get('per_page', 20);
+            $page = $request->get('page', 1);
+            $total = $allActivations->count();
+            $offset = ($page - 1) * $perPage;
+            
+            $paginatedActivations = $allActivations->slice($offset, $perPage);
+            
+            $data = [
+                'data' => $paginatedActivations->values(),
+                'current_page' => $page,
+                'per_page' => $perPage,
+                'total' => $total,
+                'last_page' => ceil($total / $perPage),
+                'from' => $offset + 1,
+                'to' => min($offset + $perPage, $total),
+            ];
 
             return response()->json([
                 'message' => 'Expired accounts retrieved successfully',
-                'data' => $expiredAccounts
+                'data' => $data
             ]);
 
         } catch (\Exception $e) {
@@ -1334,27 +1339,56 @@ class AdminController extends Controller
             }
 
             $days = $request->get('days', 7);
-            $query = Activation::with(['user'])->expiringSoon($days);
             
-            // Apply wilaya filtering only for regional admins, not global admins
+            // Get all expiring activations first (since state is encrypted, we need to filter after decryption)
+            $allActivations = Activation::with(['user'])->expiringSoon($days)->get();
+            
+            // Apply role-based filtering after decryption
             if ($currentUser->isAdmin() && !$currentUser->isGlobalAdmin()) {
-                $query->whereHas('user', function ($q) use ($currentUser) {
-                    $q->where('state', $currentUser->state);
+                // Regional admin can only see activations from users in their state
+                $allActivations = $allActivations->filter(function ($activation) use ($currentUser) {
+                    return $activation->user && $activation->user->state === $currentUser->state;
                 });
             }
-
+            
+            // Apply state filter for global admin if requested
+            if ($currentUser->isGlobalAdmin() && $request->has('state') && $request->state !== 'all') {
+                $allActivations = $allActivations->filter(function ($activation) use ($request) {
+                    return $activation->user && $activation->user->state === $request->state;
+                });
+            }
+            
             // Filter by role
             if ($request->has('role')) {
-                $query->whereHas('user', function ($q) use ($request) {
-                    $q->where('role', $request->role);
+                $allActivations = $allActivations->filter(function ($activation) use ($request) {
+                    return $activation->user && $activation->user->role === $request->role;
                 });
             }
-
-            $expiringAccounts = $query->orderBy('deactivate_at', 'asc')->paginate(20);
+            
+            // Sort by deactivate_at asc
+            $allActivations = $allActivations->sortBy('deactivate_at');
+            
+            // Apply pagination manually
+            $perPage = $request->get('per_page', 20);
+            $page = $request->get('page', 1);
+            $total = $allActivations->count();
+            $offset = ($page - 1) * $perPage;
+            
+            $paginatedActivations = $allActivations->slice($offset, $perPage);
+            
+            $data = [
+                'data' => $paginatedActivations->values(),
+                'current_page' => $page,
+                'per_page' => $perPage,
+                'total' => $total,
+                'last_page' => ceil($total / $perPage),
+                'from' => $offset + 1,
+                'to' => min($offset + $perPage, $total),
+            ];
 
             return response()->json([
                 'message' => 'Expiring accounts retrieved successfully',
-                'data' => $expiringAccounts
+                'data' => $data
             ]);
 
         } catch (\Exception $e) {
@@ -1380,34 +1414,28 @@ class AdminController extends Controller
                 ], 403);
             }
 
-            $query = User::query();
+            // Get all users first (since state is encrypted, we need to filter after decryption)
+            $allUsers = User::all();
             
-            // Apply wilaya filtering only for regional admins, not global admins
+            // Apply role-based filtering after decryption
             if ($currentUser->isAdmin() && !$currentUser->isGlobalAdmin()) {
-                $query->where('state', $currentUser->state);
+                // Regional admin can only see users from their state
+                $allUsers = $allUsers->filter(function ($user) use ($currentUser) {
+                    return $user->state === $currentUser->state;
+                });
             }
-
+            
             // Apply state filter for global admin if requested
             if ($currentUser->isGlobalAdmin() && $request->has('state') && $request->state !== 'all') {
-                // Since state is encrypted, we need to filter after decryption
-                $allUsers = $query->get();
-                $filteredUsers = $allUsers->filter(function ($user) use ($request) {
+                $allUsers = $allUsers->filter(function ($user) use ($request) {
                     return $user->state === $request->state;
                 });
-                
-                // Filter for clients that are not approved
-                $pendingClients = $filteredUsers->filter(function ($user) {
-                    return $user->role === 'client' && !$user->is_approved;
-                })->values();
-            } else {
-                // Get all users and filter in PHP for pending clients
-                $users = $query->get();
-                
-                // Filter for clients that are not approved
-                $pendingClients = $users->filter(function ($user) {
-                    return $user->role === 'client' && !$user->is_approved;
-                })->values();
             }
+            
+            // Filter for clients that are not approved
+            $pendingClients = $allUsers->filter(function ($user) {
+                return $user->role === 'client' && !$user->is_approved;
+            })->values();
 
             // Apply pagination manually
             $perPage = $request->get('per_page', 20);
