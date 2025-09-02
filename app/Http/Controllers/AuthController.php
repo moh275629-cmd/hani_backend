@@ -787,14 +787,19 @@ class AuthController extends Controller
         $otp = $request->otp;
         $newPassword = $request->new_password;
 
-        // Verify OTP
-        $otpRecord = Otp::findByIdentifier($email);
-        
-        if (!$otpRecord || $otpRecord->otp !== $otp || 
-            $otpRecord->type !== 'password_reset' || 
-            $otpRecord->isExpired() || 
-            $otpRecord->is_used) {
-            $otpRecord = null; // Reset to null if any condition fails
+        // Verify OTP - get all OTPs and filter manually to handle any potential encryption issues
+        $otpRecords = Otp::where('type', 'password_reset')
+            ->where('otp', $otp)
+            ->where('is_used', false)
+            ->where('expires_at', '>', now())
+            ->get();
+
+        $otpRecord = null;
+        foreach ($otpRecords as $record) {
+            if ($record->identifier === $email) {
+                $otpRecord = $record;
+                break;
+            }
         }
 
         if (!$otpRecord) {
