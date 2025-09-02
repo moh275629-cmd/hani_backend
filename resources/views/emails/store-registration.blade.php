@@ -116,8 +116,9 @@
             <ol>
                 <li><strong>Verify your email</strong> using the OTP code sent separately</li>
                 <li><strong>Prepare the required documents</strong> listed below</li>
-                <li><strong>Wait for admin approval</strong> from your state's Hani App administrator</li>
                 <li><strong>Visit the Hani App desktop application</strong> in your state to complete the verification process</li>
+            <li><strong>Wait for admin approval</strong> from your state's Hani App administrator</li>
+              
             </ol>
         </div>
 
@@ -130,8 +131,6 @@
                 <div class="document-name">{{ $document->getDocumentName('en') }}</div>
                 <div class="document-description">{{ $document->getDescription('en') }}</div>
                 <div class="document-details">
-                    <strong>File Types:</strong> {{ $document->getFileTypesText() }} | 
-                    <strong>Max Size:</strong> {{ $document->getMaxFileSizeText() }} | 
                     <strong>Required:</strong> {{ $document->isRequired() ? 'Yes' : 'No' }}
                 </div>
             </div>

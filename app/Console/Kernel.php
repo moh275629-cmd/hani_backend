@@ -13,6 +13,7 @@ class Kernel extends ConsoleKernel
     protected function schedule(Schedule $schedule)
     {
         $schedule->command('editrequests:approve-old')->hourly();
+        $schedule->command('accounts:deactivate-expired')->daily();
     }
     
 

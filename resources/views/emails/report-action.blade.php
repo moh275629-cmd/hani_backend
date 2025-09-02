@@ -66,7 +66,7 @@
         
         @if($action === 'close_account')
             <div class="warning">
-                <p><strong>Important:</strong> Your account has been temporarily deactivated due to the report filed against you.</p>
+                <p><strong>Important:</strong> Your account has been deactivated due to the report filed against you.</p>
                 <p>To reactivate your account, please contact your local Hani administrator for review.</p>
             </div>
         @elseif($action === 'warning')

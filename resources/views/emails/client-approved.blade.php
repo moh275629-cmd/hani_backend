@@ -63,11 +63,7 @@
         
         <p><strong>Your account is now active and will remain so for 1 year.</strong></p>
         
-        <div style="text-align: center;">
-            <a href="{{ config('app.frontend_url', 'https://hani.app') }}/login" class="button">
-                Login to Your Account
-            </a>
-        </div>
+    
         
         <p>If you have any questions or need assistance, please don't hesitate to contact our support team.</p>
         
