@@ -769,7 +769,7 @@ class AuthController extends Controller
     public function resetPassword(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'email' => 'required|string|email|exists:users,email',
+            'email' => 'required|string|email',
             'otp' => 'required|string|size:6',
             'new_password' => 'required|string|min:8|confirmed',
             'new_password_confirmation' => 'required|string',
