@@ -33,7 +33,7 @@ class LoyaltyCardController extends Controller
 
             if (!$loyaltyCard) {
                 // Auto-create a loyalty card for the user if it does not exist
-                $cardNumber = $this->generateCardNumber();
+                $cardNumber = $this->generateCardNumber($user->id);
                 $loyaltyCard = LoyaltyCard::create([
                     'user_id' => $user->id,
                     'card_number' => $cardNumber,
@@ -82,7 +82,7 @@ class LoyaltyCardController extends Controller
         }
 
         // Generate unique card number
-        $cardNumber = $this->generateCardNumber();
+        $cardNumber = $this->generateCardNumber($user->id);
         
         // Create new loyalty card
         $loyaltyCard = LoyaltyCard::create([
@@ -128,10 +128,10 @@ class LoyaltyCardController extends Controller
     /**
      * Generate a unique loyalty card number
      */
-    private function generateCardNumber(): string
+    private function generateCardNumber(int $userId): string
     {
         do {
-            $cardNumber = 'HANI' . str_pad(rand(0, 999999), 6, '0', STR_PAD_LEFT);
+            $cardNumber = 'HANI' . str_pad($userId, 6, '0', STR_PAD_LEFT);
         } while (LoyaltyCard::where('card_number', $cardNumber)->exists());
 
         return $cardNumber;
