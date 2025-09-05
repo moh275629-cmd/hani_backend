@@ -131,7 +131,7 @@ class StoreController extends Controller
         }]);
 
         // Add image URLs to store
-        $store->logo_url = $store->hasLogoBlob() 
+        $store->logo = $store->hasLogoBlob() 
             ? url("/api/images/store/{$store->id}/logo")
             : null;
         $store->banner_url = $store->hasBannerBlob() 
@@ -188,7 +188,7 @@ class StoreController extends Controller
         }]);
 
         // Add image URLs to store
-        $store->logo_url = $store->hasLogoBlob() 
+        $store->logo = $store->hasLogoBlob() 
             ? url("/api/images/store/{$store->id}/logo")
             : null;
         $store->banner_url = $store->hasBannerBlob() 
@@ -252,7 +252,7 @@ class StoreController extends Controller
 
         // Add image URLs to stores
         $stores->transform(function ($store) {
-            $store->logo_url = $store->hasLogoBlob() 
+            $store->logo = $store->hasLogoBlob() 
                 ? url("/api/images/store/{$store->id}/logo")
                 : null;
             $store->banner_url = $store->hasBannerBlob() 
