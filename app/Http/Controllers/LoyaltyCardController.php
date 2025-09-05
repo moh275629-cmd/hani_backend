@@ -130,11 +130,7 @@ class LoyaltyCardController extends Controller
      */
     private function generateCardNumber(int $userId): string
     {
-        do {
-            $cardNumber = 'HANI' . str_pad($userId, 6, '0', STR_PAD_LEFT);
-        } while (LoyaltyCard::where('card_number', $cardNumber)->exists());
-
-        return $cardNumber;
+        return 'HANI' . str_pad($userId, 6, '0', STR_PAD_LEFT);
     }
 
     /**
