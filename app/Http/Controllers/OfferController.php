@@ -41,6 +41,12 @@ class OfferController extends Controller
         // Filter by store location if provided
         if ($request->has('state')) {
             $state = $request->get('state');
+            \Log::info('Offers filtering by state', ['state' => $state]);
+            
+            // Debug: Show what states exist in the database
+            $existingStates = \App\Models\Store::distinct()->pluck('state')->filter()->values();
+            \Log::info('Available states in database', ['states' => $existingStates->toArray()]);
+            
             $query->whereHas('store', function($q) use ($state) {
                 $q->where('state', 'like', '%' . $state . '%');
             });
@@ -48,6 +54,18 @@ class OfferController extends Controller
 
         if ($request->has('city')) {
             $city = $request->get('city');
+            \Log::info('Offers filtering by city', ['city' => $city]);
+            
+            // Debug: Show what cities exist in the database for the selected state
+            if ($request->has('state')) {
+                $existingCities = \App\Models\Store::where('state', 'like', '%' . $request->get('state') . '%')
+                    ->distinct()->pluck('city')->filter()->values();
+                \Log::info('Available cities in database for state', [
+                    'state' => $request->get('state'),
+                    'cities' => $existingCities->toArray()
+                ]);
+            }
+            
             $query->whereHas('store', function($q) use ($city) {
                 $q->where('city', 'like', '%' . $city . '%');
             });
@@ -69,6 +87,11 @@ class OfferController extends Controller
             'total_offers' => $offers->total(),
             'current_page' => $offers->currentPage(),
             'per_page' => $offers->perPage(),
+            'filters_applied' => [
+                'state' => $request->get('state'),
+                'city' => $request->get('city'),
+                'search' => $request->get('search'),
+            ],
             'offers' => $offers->items()
         ]);
 
