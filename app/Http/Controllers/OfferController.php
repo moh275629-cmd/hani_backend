@@ -41,34 +41,86 @@ class OfferController extends Controller
         // Filter by store location if provided
         if ($request->has('state')) {
             $state = $request->get('state');
-            \Log::info('Offers filtering by state', ['state' => $state]);
+            \Log::info('Filtering offers by state', ['requested_state' => $state]);
             
-            // Debug: Show what states exist in the database
-            $existingStates = \App\Models\Store::distinct()->pluck('state')->filter()->values();
-            \Log::info('Available states in database', ['states' => $existingStates->toArray()]);
+            // Get all stores and filter by decrypted state
+            $allStores = \App\Models\Store::all();
+            $matchingStoreIds = [];
             
-            $query->whereHas('store', function($q) use ($state) {
-                $q->where('state', 'like', '%' . $state . '%');
-            });
+            foreach ($allStores as $store) {
+                try {
+                    $decryptedState = $store->state; // This will be decrypted by the accessor
+                    if ($decryptedState === $state) {
+                        $matchingStoreIds[] = $store->id;
+                        \Log::info('Store matches state filter', [
+                            'store_id' => $store->id,
+                            'decrypted_state' => $decryptedState,
+                            'requested_state' => $state
+                        ]);
+                    }
+                } catch (\Exception $e) {
+                    // If decryption fails, skip this store
+                    \Log::warning('Failed to decrypt state for store', [
+                        'store_id' => $store->id,
+                        'error' => $e->getMessage()
+                    ]);
+                    continue;
+                }
+            }
+            
+            \Log::info('State filtering results', [
+                'matching_store_ids' => $matchingStoreIds,
+                'total_stores_checked' => $allStores->count()
+            ]);
+            
+            if (!empty($matchingStoreIds)) {
+                $query->whereIn('store_id', $matchingStoreIds);
+            } else {
+                // If no stores match, return empty result
+                $query->whereRaw('1 = 0');
+            }
         }
 
         if ($request->has('city')) {
             $city = $request->get('city');
-            \Log::info('Offers filtering by city', ['city' => $city]);
+            \Log::info('Filtering offers by city', ['requested_city' => $city]);
             
-            // Debug: Show what cities exist in the database for the selected state
-            if ($request->has('state')) {
-                $existingCities = \App\Models\Store::where('state', 'like', '%' . $request->get('state') . '%')
-                    ->distinct()->pluck('city')->filter()->values();
-                \Log::info('Available cities in database for state', [
-                    'state' => $request->get('state'),
-                    'cities' => $existingCities->toArray()
-                ]);
+            // Get all stores and filter by decrypted city
+            $allStores = \App\Models\Store::all();
+            $matchingStoreIds = [];
+            
+            foreach ($allStores as $store) {
+                try {
+                    $decryptedCity = $store->city; // This will be decrypted by the accessor
+                    if ($decryptedCity === $city) {
+                        $matchingStoreIds[] = $store->id;
+                        \Log::info('Store matches city filter', [
+                            'store_id' => $store->id,
+                            'decrypted_city' => $decryptedCity,
+                            'requested_city' => $city
+                        ]);
+                    }
+                } catch (\Exception $e) {
+                    // If decryption fails, skip this store
+                    \Log::warning('Failed to decrypt city for store', [
+                        'store_id' => $store->id,
+                        'error' => $e->getMessage()
+                    ]);
+                    continue;
+                }
             }
             
-            $query->whereHas('store', function($q) use ($city) {
-                $q->where('city', 'like', '%' . $city . '%');
-            });
+            \Log::info('City filtering results', [
+                'matching_store_ids' => $matchingStoreIds,
+                'total_stores_checked' => $allStores->count()
+            ]);
+            
+            if (!empty($matchingStoreIds)) {
+                $query->whereIn('store_id', $matchingStoreIds);
+            } else {
+                // If no stores match, return empty result
+                $query->whereRaw('1 = 0');
+            }
         }
 
         // Search by title or description
@@ -87,11 +139,6 @@ class OfferController extends Controller
             'total_offers' => $offers->total(),
             'current_page' => $offers->currentPage(),
             'per_page' => $offers->perPage(),
-            'filters_applied' => [
-                'state' => $request->get('state'),
-                'city' => $request->get('city'),
-                'search' => $request->get('search'),
-            ],
             'offers' => $offers->items()
         ]);
 
