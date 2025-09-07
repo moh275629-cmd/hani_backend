@@ -330,6 +330,17 @@ class AdminController extends Controller
             // Get all stores first (since state is encrypted, we need to filter after decryption)
             $allStores = $query->get();
             
+            // Debug: Log sample store states
+            \Log::info('Sample store states in database', [
+                'total_stores' => $allStores->count(),
+                'sample_states' => $allStores->take(5)->map(function($store) {
+                    return [
+                        'store_id' => $store->id,
+                        'state' => $store->state
+                    ];
+                })->toArray()
+            ]);
+            
             // Apply role-based filtering after decryption
             if ($currentUser->isAdmin() && !$currentUser->isGlobalAdmin()) {
                 // Local admin can only see stores whose owner is in same state
@@ -340,9 +351,27 @@ class AdminController extends Controller
             
             // Apply state filter if provided (for global admins)
             if ($request->has('state')) {
+                \Log::info('Admin filtering stores by state', [
+                    'requested_state' => $request->state,
+                    'total_stores_before_filter' => $allStores->count()
+                ]);
+                
                 $allStores = $allStores->filter(function ($store) use ($request) {
-                    return $store->state === $request->state;
+                    $matches = $store->state === $request->state;
+                    if ($matches) {
+                        \Log::info('Store matches state filter', [
+                            'store_id' => $store->id,
+                            'store_state' => $store->state,
+                            'requested_state' => $request->state
+                        ]);
+                    }
+                    return $matches;
                 });
+                
+                \Log::info('State filtering results', [
+                    'matching_stores' => $allStores->count(),
+                    'requested_state' => $request->state
+                ]);
             }
             
             // Apply pagination
