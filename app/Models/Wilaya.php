@@ -143,12 +143,12 @@ class Wilaya extends Model
 
     public static function getActiveWilayas()
     {
-        return self::active()->orderBy('name_en')->get();
+        return self::active()->orderBy('code')->get();
     }
 
     public static function getWilayasWithoutAdmin()
     {
-        return self::active()->withoutAdmin()->orderBy('name_en')->get();
+        return self::active()->withoutAdmin()->orderBy('code')->get();
     }
 
     public static function createWilaya($data)
