@@ -31,6 +31,29 @@ Route::post('/verify-otp', [AuthController::class, 'verifyOtp']);
 Route::post('/password/reset-request', [AuthController::class, 'requestPasswordReset']);
 Route::post('/password/reset', [AuthController::class, 'resetPassword']);
 
+// Public Wilaya routes
+Route::get('/wilayas', function () {
+    return response()->json([
+        'message' => 'Wilayas retrieved successfully',
+        'data' => \App\Models\Wilaya::getActiveWilayas()
+    ]);
+});
+
+Route::get('/wilayas/search', function (Request $request) {
+    $query = $request->get('q', '');
+    $wilayas = \App\Models\Wilaya::where(function ($q) use ($query) {
+        $q->where('name_en', 'like', "%{$query}%")
+          ->orWhere('name_fr', 'like', "%{$query}%")
+          ->orWhere('name_ar', 'like', "%{$query}%")
+          ->orWhere('code', 'like', "%{$query}%");
+    })->where('is_active', true)->get();
+    
+    return response()->json([
+        'message' => 'Wilayas search completed',
+        'data' => $wilayas
+    ]);
+});
+
 // Public City routes
 Route::get('/cities', function () {
     return response()->json([
