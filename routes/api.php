@@ -16,6 +16,8 @@ use App\Http\Controllers\RatingController;
 use App\Http\Controllers\OfferRatingController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ActivationController;
+use App\Http\Controllers\WilayaController;
+use App\Http\Controllers\CityController;
 
 // Public routes
 Route::post('/register', [AuthController::class, 'register']);
@@ -29,21 +31,43 @@ Route::post('/verify-otp', [AuthController::class, 'verifyOtp']);
 Route::post('/password/reset-request', [AuthController::class, 'requestPasswordReset']);
 Route::post('/password/reset', [AuthController::class, 'resetPassword']);
 
-// Public Wilaya routes
-Route::get('/wilayas', function () {
+// Public City routes
+Route::get('/cities', function () {
     return response()->json([
-        'message' => 'Wilayas retrieved successfully',
-        'data' => \App\Services\WilayaService::getAllWilayas()
+        'message' => 'Cities retrieved successfully',
+        'data' => \App\Models\City::getActiveCities()
     ]);
 });
 
-Route::get('/wilayas/search', function (Request $request) {
+Route::get('/cities/search', function (Request $request) {
     $query = $request->get('q', '');
-    $results = \App\Services\WilayaService::searchWilayas($query);
+    $wilayaCode = $request->get('wilaya_code');
+    
+    $citiesQuery = \App\Models\City::where(function ($q) use ($query) {
+        $q->where('name_en', 'like', "%{$query}%")
+          ->orWhere('name_fr', 'like', "%{$query}%")
+          ->orWhere('name_ar', 'like', "%{$query}%")
+          ->orWhere('code', 'like', "%{$query}%");
+    })->where('is_active', true);
+    
+    if ($wilayaCode) {
+        $citiesQuery->where('wilaya_code', $wilayaCode);
+    }
+    
+    $cities = $citiesQuery->with('wilaya')->orderBy('name_en')->limit(20)->get();
     
     return response()->json([
-        'message' => 'Wilayas search completed',
-        'data' => $results
+        'message' => 'Cities search completed',
+        'data' => $cities
+    ]);
+});
+
+Route::get('/cities/wilaya/{wilayaCode}', function ($wilayaCode) {
+    $cities = \App\Models\City::getByWilaya($wilayaCode);
+    
+    return response()->json([
+        'message' => 'Cities retrieved successfully',
+        'data' => $cities
     ]);
 });
 
@@ -254,6 +278,30 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/required-documents', [GlobalAdminController::class, 'createRequiredDocument']);
         Route::put('/required-documents/{document}', [GlobalAdminController::class, 'updateRequiredDocument']);
         Route::delete('/required-documents/{document}', [GlobalAdminController::class, 'deleteRequiredDocument']);
+        
+        // Wilaya Management
+        Route::prefix('wilayas')->group(function () {
+            Route::get('/', [WilayaController::class, 'index']);
+            Route::post('/', [WilayaController::class, 'store']);
+            Route::get('/without-admin', [WilayaController::class, 'withoutAdmin']);
+            Route::get('/{id}', [WilayaController::class, 'show']);
+            Route::put('/{id}', [WilayaController::class, 'update']);
+            Route::delete('/{id}', [WilayaController::class, 'destroy']);
+            Route::post('/{id}/assign-admin', [WilayaController::class, 'assignAdmin']);
+            Route::delete('/{id}/remove-admin', [WilayaController::class, 'removeAdmin']);
+            Route::get('/{id}/statistics', [WilayaController::class, 'statistics']);
+        });
+        
+        // City Management
+        Route::prefix('cities')->group(function () {
+            Route::get('/', [CityController::class, 'index']);
+            Route::post('/', [CityController::class, 'store']);
+            Route::get('/wilaya/{wilayaCode}', [CityController::class, 'getByWilaya']);
+            Route::get('/search', [CityController::class, 'search']);
+            Route::get('/{id}', [CityController::class, 'show']);
+            Route::put('/{id}', [CityController::class, 'update']);
+            Route::delete('/{id}', [CityController::class, 'destroy']);
+        });
     });
 });
 
