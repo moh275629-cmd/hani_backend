@@ -23,7 +23,6 @@ class Wilaya extends Model
         'admin_office_longitude',
         'admin_office_phone',
         'admin_office_email',
-        'admin_user_id',
         'created_by',
         'updated_by',
     ];
@@ -46,7 +45,7 @@ class Wilaya extends Model
     // Relationships
     public function admin()
     {
-        return $this->belongsTo(User::class, 'admin_user_id');
+        return $this->hasOne(Admin::class, 'wilaya_code', 'code');
     }
 
     public function creator()
@@ -108,19 +107,19 @@ class Wilaya extends Model
 
     public function hasAdmin()
     {
-        return !is_null($this->admin_user_id);
+        return $this->admin()->exists();
     }
 
     public function assignAdmin($userId)
     {
-        $this->admin_user_id = $userId;
-        $this->save();
+        // This method is now handled by the Admin model creation
+        // The GlobalAdminController creates Admin records with wilaya_code
     }
 
     public function removeAdmin()
     {
-        $this->admin_user_id = null;
-        $this->save();
+        // This method is now handled by deleting the Admin record
+        $this->admin()?->delete();
     }
 
     public function activate()

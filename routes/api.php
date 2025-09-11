@@ -296,6 +296,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/admins/{admin}', [GlobalAdminController::class, 'updateAdmin']);
         Route::delete('/admins/{admin}', [GlobalAdminController::class, 'deleteAdmin']);
         
+        Route::get('/wilayas/with-admins', [WilayaController::class, 'withAdmins']);
+        
         Route::get('/terms-and-conditions', [GlobalAdminController::class, 'termsAndConditions']);
         Route::post('/terms-and-conditions', [GlobalAdminController::class, 'createTermsAndConditions']);
         Route::put('/terms-and-conditions/{terms}', [GlobalAdminController::class, 'updateTermsAndConditions']);

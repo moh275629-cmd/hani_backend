@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Wilaya;
 use App\Models\User;
+use App\Models\Admin;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
@@ -18,7 +19,7 @@ class WilayaController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
-            $query = Wilaya::with(['admin', 'creator', 'updater']);
+            $query = Wilaya::with(['admin.user', 'creator', 'updater']);
 
             // Apply filters
             if ($request->has('search')) {
@@ -58,12 +59,69 @@ class WilayaController extends Controller
     }
 
     /**
+     * Get wilayas with admins
+     */
+    public function withAdmins(Request $request): JsonResponse
+    {
+        try {
+            // Get wilayas with admins
+            $withAdminsQuery = Wilaya::with(['admin.user', 'creator', 'updater'])
+                ->whereHas('admin');
+                
+            // Get wilayas without admins
+            $withoutAdminsQuery = Wilaya::with(['creator', 'updater'])
+                ->whereDoesntHave('admin');
+                
+            // Apply search filter to both queries if provided
+            if ($request->has('search')) {
+                $search = $request->search;
+                $searchFunction = function ($q) use ($search) {
+                    $q->where('name_en', 'like', "%{$search}%")
+                      ->orWhere('name_fr', 'like', "%{$search}%")
+                      ->orWhere('name_ar', 'like', "%{$search}%")
+                      ->orWhere('code', 'like', "%{$search}%");
+                };
+                
+                $withAdminsQuery->where($searchFunction);
+                $withoutAdminsQuery->where($searchFunction);
+            }
+    
+            // Apply active filter to both queries if provided
+            if ($request->has('is_active')) {
+                $isActive = $request->boolean('is_active');
+                $withAdminsQuery->where('is_active', $isActive);
+                $withoutAdminsQuery->where('is_active', $isActive);
+            }
+    
+            $wilayasWithAdmins = $withAdminsQuery->orderBy('code')->get();
+            $wilayasWithoutAdmins = $withoutAdminsQuery->orderBy('code')->get();
+    
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'with_admins' => $wilayasWithAdmins,
+                    'without_admins' => $wilayasWithoutAdmins,
+                    'stats' => [
+                        'total_with_admins' => $wilayasWithAdmins->count(),
+                        'total_without_admins' => $wilayasWithoutAdmins->count(),
+                        'total_wilayas' => $wilayasWithAdmins->count() + $wilayasWithoutAdmins->count()
+                    ]
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch wilayas: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+    /**
      * Get wilaya by ID
      */
     public function show($id): JsonResponse
     {
         try {
-            $wilaya = Wilaya::with(['admin', 'creator', 'updater'])->findOrFail($id);
+            $wilaya = Wilaya::with(['admin.user', 'creator', 'updater'])->findOrFail($id);
 
             return response()->json([
                 'success' => true,
@@ -331,7 +389,7 @@ class WilayaController extends Controller
                 'active_stores' => $wilaya->stores()->where('is_active', true)->count(),
                 'total_users' => $wilaya->users()->count(),
                 'has_admin' => $wilaya->hasAdmin(),
-                'admin_name' => $wilaya->admin ? $wilaya->admin->name : null,
+                'admin_name' => $wilaya->admin ? $wilaya->admin->user->name : null,
             ];
 
             return response()->json([
