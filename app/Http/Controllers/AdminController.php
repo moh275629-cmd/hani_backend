@@ -69,35 +69,6 @@ class AdminController extends Controller
         return response()->json(['success' => true, 'data' => $admin]);
     }
 
-    public function updateByUser(Request $request, $userId)
-    {
-        $admin = Admin::where('user_id', $userId)->first();
-        $data = $request->all();
-        $validator = Validator::make($data, [
-            'wilaya_code' => 'nullable|exists:wilayas,code',
-            'office_address' => 'nullable|string|max:500',
-            'office_location_lat' => 'nullable|numeric|between:-90,90',
-            'office_location_lng' => 'nullable|numeric|between:-180,180',
-            'office_phone' => 'nullable|string|max:50',
-            'office_email' => 'nullable|email|max:255',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
-        }
-
-        if (!$admin) {
-            // Create if not exists
-            $payload = $validator->validated();
-            $payload['user_id'] = $userId;
-            $admin = Admin::create($payload);
-        } else {
-            $admin->update($validator->validated());
-        }
-
-        return response()->json(['success' => true, 'data' => $admin]);
-    }
-
     public function destroy($id)
     {
         $admin = Admin::findOrFail($id);
