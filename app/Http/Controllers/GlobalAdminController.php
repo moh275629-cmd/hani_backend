@@ -199,6 +199,52 @@ class GlobalAdminController extends Controller
     }
 
     /**
+     * Get a single admin with office details
+     */
+    public function getAdmin(int $admin): JsonResponse
+    {
+        try {
+            $user = User::find($admin);
+            if (!$user) {
+                return response()->json([
+                    'message' => 'Admin not found',
+                ], 404);
+            }
+
+            if (!in_array($user->role, ['admin', 'global_admin'])) {
+                return response()->json([
+                    'message' => 'User is not an admin',
+                ], 400);
+            }
+
+            $adminDetails = Admin::where('user_id', $user->id)->first();
+
+            return response()->json([
+                'message' => 'Admin retrieved successfully',
+                'data' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'phone' => $user->phone,
+                    'role' => $user->role,
+                    'state' => $user->state,
+                    'is_active' => $user->is_active,
+                    'office_address' => $adminDetails->office_address ?? null,
+                    'office_location_lat' => $adminDetails->office_location_lat ?? null,
+                    'office_location_lng' => $adminDetails->office_location_lng ?? null,
+                    'wilaya_code' => $adminDetails->wilaya_code ?? $user->state,
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Error retrieving admin',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Update admin details
      */
     public function updateAdmin(Request $request, $admin): JsonResponse

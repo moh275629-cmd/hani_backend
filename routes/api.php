@@ -292,6 +292,7 @@ Route::middleware('auth:sanctum')->group(function () {
         // Admins management (handled by GlobalAdminController)
         Route::get('/admins', [GlobalAdminController::class, 'admins']);
         Route::post('/admins', [GlobalAdminController::class, 'createAdmin']);
+        Route::get('/admins/{admin}', [GlobalAdminController::class, 'getAdmin']);
         Route::put('/admins/{admin}', [GlobalAdminController::class, 'updateAdmin']);
         Route::delete('/admins/{admin}', [GlobalAdminController::class, 'deleteAdmin']);
         
