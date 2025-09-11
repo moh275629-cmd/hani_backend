@@ -4,8 +4,20 @@ namespace App\Http\Controllers;
 
 use App\Models\Admin;
 use App\Models\User;
+use App\Models\Store;
+use App\Models\Branch;
+use App\Models\Offer;
+use App\Models\Purchase;
+use App\Models\LoyaltyCard;
+use App\Models\Notification;
+use App\Models\Report;
+use App\Models\Activation;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Log;
 
 class AdminController extends Controller
 {
@@ -75,32 +87,8 @@ class AdminController extends Controller
         $admin->delete();
         return response()->json(['success' => true]);
     }
-}
-
-<?php
-
-namespace App\Http\Controllers;
-
-use App\Models\User;
-use App\Models\Store;
-use App\Models\Branch;
-use App\Models\Offer;
-use App\Models\Purchase;
-use App\Models\LoyaltyCard;
-use App\Models\Notification;
-use App\Models\Report;
-use App\Models\Activation;
-use Illuminate\Http\Request;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\Log;
-
-class AdminController extends Controller
-{
     /**
-* Get admin dashboard statistics
+     * Get admin dashboard statistics
      */
     public function dashboard(): JsonResponse
     {
@@ -118,7 +106,7 @@ class AdminController extends Controller
                 'total_points_issued' => LoyaltyCard::sum('points'),
             ];
 
-                 // Monthly statistics for the last 6 months
+            // Monthly statistics for the last 6 months
             $monthlyStats = [];
             for ($i = 5; $i >= 0; $i--) {
                 $date = now()->subMonths($i);
