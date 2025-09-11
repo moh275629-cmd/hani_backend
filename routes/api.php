@@ -148,14 +148,7 @@ Route::get('/images/temp/{tempId}', [ImageController::class, 'serveTempImage']);
 
 // Protected routes
 Route::middleware('auth:sanctum')->group(function () {
-    // Global Admin - Admins management
-    Route::middleware('can:manage-global')->group(function () {
-        Route::get('/global-admin/admins', [AdminController::class, 'index']);
-        Route::post('/global-admin/admins', [AdminController::class, 'store']);
-        Route::get('/global-admin/admins/{id}', [AdminController::class, 'show']);
-        Route::put('/global-admin/admins/{id}', [AdminController::class, 'update']);
-        Route::delete('/global-admin/admins/{id}', [AdminController::class, 'destroy']);
-    });
+    // (removed duplicate Global Admin admins management routes; see the dedicated global-admin group below)
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/profile', [AuthController::class, 'profile']);
     Route::put('/profile', [AuthController::class, 'updateProfile']);
@@ -296,10 +289,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Global Admin routes
     Route::prefix('global-admin')->middleware('global.admin')->group(function () {
-        Route::get('/admins', [GlobalAdminController::class, 'admins']);
-        Route::post('/admins', [GlobalAdminController::class, 'createAdmin']);
-        Route::put('/admins/{admin}', [GlobalAdminController::class, 'updateAdmin']);
-        Route::delete('/admins/{admin}', [GlobalAdminController::class, 'deleteAdmin']);
+        // Admins management (use unified AdminController)
+        Route::get('/admins', [AdminController::class, 'index']);
+        Route::post('/admins', [AdminController::class, 'store']);
+        Route::get('/admins/{id}', [AdminController::class, 'show']);
+        Route::put('/admins/{id}', [AdminController::class, 'update']);
+        Route::delete('/admins/{id}', [AdminController::class, 'destroy']);
         
         Route::get('/terms-and-conditions', [GlobalAdminController::class, 'termsAndConditions']);
         Route::post('/terms-and-conditions', [GlobalAdminController::class, 'createTermsAndConditions']);
