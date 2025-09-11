@@ -92,13 +92,15 @@ class WilayaController extends Controller
                 $withAdminsQuery->where('is_active', $isActive);
                 $withoutAdminsQuery->where('is_active', $isActive);
             }
-    
+            $querywilayas = Wilaya::with(['admin.user', 'creator', 'updater']);
+            $wilayas = $querywilayas->orderByRaw('CAST(code AS UNSIGNED)')->paginate(20);
             $wilayasWithAdmins = $withAdminsQuery->orderBy('code')->get();
             $wilayasWithoutAdmins = $withoutAdminsQuery->orderBy('code')->get();
     
             return response()->json([
                 'success' => true,
                 'data' => [
+                    'all_wilayas' => $wilayas,
                     'with_admins' => $wilayasWithAdmins,
                     'without_admins' => $wilayasWithoutAdmins,
                     'stats' => [
