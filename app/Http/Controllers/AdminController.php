@@ -2,6 +2,85 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Admin;
+use App\Models\User;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
+
+class AdminController extends Controller
+{
+    public function index()
+    {
+        $admins = Admin::with(['user', 'wilaya'])->paginate(50);
+        return response()->json(['success' => true, 'data' => $admins]);
+    }
+
+    public function show($id)
+    {
+        $admin = Admin::with(['user', 'wilaya'])->findOrFail($id);
+        return response()->json(['success' => true, 'data' => $admin]);
+    }
+
+    public function store(Request $request)
+    {
+        $data = $request->all();
+        $validator = Validator::make($data, [
+            'user_id' => 'required|exists:users,id|unique:admins,user_id',
+            'wilaya_code' => 'nullable|exists:wilayas,code',
+            'office_address' => 'nullable|string|max:500',
+            'office_location_lat' => 'nullable|numeric|between:-90,90',
+            'office_location_lng' => 'nullable|numeric|between:-180,180',
+            'office_phone' => 'nullable|string|max:50',
+            'office_email' => 'nullable|email|max:255',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
+        }
+
+        // Ensure user has role admin
+        $user = User::findOrFail($data['user_id']);
+        if ($user->role !== 'admin') {
+            return response()->json(['success' => false, 'message' => 'User is not admin role'], 422);
+        }
+
+        $admin = Admin::create($validator->validated());
+        return response()->json(['success' => true, 'data' => $admin], 201);
+    }
+
+    public function update(Request $request, $id)
+    {
+        $admin = Admin::findOrFail($id);
+        $data = $request->all();
+        $validator = Validator::make($data, [
+            'wilaya_code' => 'nullable|exists:wilayas,code',
+            'office_address' => 'nullable|string|max:500',
+            'office_location_lat' => 'nullable|numeric|between:-90,90',
+            'office_location_lng' => 'nullable|numeric|between:-180,180',
+            'office_phone' => 'nullable|string|max:50',
+            'office_email' => 'nullable|email|max:255',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
+        }
+
+        $admin->update($validator->validated());
+        return response()->json(['success' => true, 'data' => $admin]);
+    }
+
+    public function destroy($id)
+    {
+        $admin = Admin::findOrFail($id);
+        $admin->delete();
+        return response()->json(['success' => true]);
+    }
+}
+
+<?php
+
+namespace App\Http\Controllers;
+
 use App\Models\User;
 use App\Models\Store;
 use App\Models\Branch;

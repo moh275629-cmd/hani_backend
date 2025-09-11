@@ -147,6 +147,14 @@ Route::get('/images/temp/{tempId}', [ImageController::class, 'serveTempImage']);
 
 // Protected routes
 Route::middleware('auth:sanctum')->group(function () {
+    // Global Admin - Admins management
+    Route::middleware('can:manage-global')->group(function () {
+        Route::get('/global-admin/admins', [AdminController::class, 'index']);
+        Route::post('/global-admin/admins', [AdminController::class, 'store']);
+        Route::get('/global-admin/admins/{id}', [AdminController::class, 'show']);
+        Route::put('/global-admin/admins/{id}', [AdminController::class, 'update']);
+        Route::delete('/global-admin/admins/{id}', [AdminController::class, 'destroy']);
+    });
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/profile', [AuthController::class, 'profile']);
     Route::put('/profile', [AuthController::class, 'updateProfile']);
