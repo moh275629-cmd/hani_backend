@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Models\Admin;
 use App\Models\TermsAndConditions;
 use App\Models\RequiredDocuments;
 use Illuminate\Http\Request;
@@ -104,7 +105,12 @@ class GlobalAdminController extends Controller
             'phone' => 'nullable|string|max:20',
             'password' => 'required|string|min:8',
             'role' => 'sometimes|in:admin,global_admin',
+            // store wilaya code in users.state for regional admins
             'state' => 'nullable|string|max:255',
+            // admin-specific office fields
+            'office_address' => 'nullable|string|max:500',
+            'office_location_lat' => 'nullable|numeric|between:-90,90',
+            'office_location_lng' => 'nullable|numeric|between:-180,180',
         ]);
 
         if ($validator->fails()) {
@@ -148,6 +154,19 @@ class GlobalAdminController extends Controller
                 'email_verified_at' => now(), // Auto-verify admin emails
                 'phone_verified_at' => now(), // Auto-verify admin phones
             ]);
+
+            // Create related Admin record for office details if applicable
+            if ($admin && $admin->role === 'admin') {
+                Admin::updateOrCreate(
+                    ['user_id' => $admin->id],
+                    [
+                        'wilaya_code' => $request->state,
+                        'office_address' => $request->office_address,
+                        'office_location_lat' => $request->office_location_lat,
+                        'office_location_lng' => $request->office_location_lng,
+                    ]
+                );
+            }
 
             DB::commit();
 
@@ -224,6 +243,10 @@ class GlobalAdminController extends Controller
                 'password' => 'nullable|string|min:8',
                 'role' => 'sometimes|required|in:admin,global_admin',
                 'state' => 'nullable|string|max:255',
+                // admin-specific office fields
+                'office_address' => 'nullable|string|max:500',
+                'office_location_lat' => 'nullable|numeric|between:-90,90',
+                'office_location_lng' => 'nullable|numeric|between:-180,180',
                 'is_active' => 'sometimes|boolean',
             ]);
 
@@ -243,6 +266,25 @@ class GlobalAdminController extends Controller
             }
 
             $adminModel->update($updateData);
+
+            // Sync Admin office details if admin role
+            if ($adminModel->role === 'admin') {
+                $adminDetails = Admin::firstOrNew(['user_id' => $adminModel->id]);
+                // Only update provided fields to avoid nulling existing values
+                if ($request->has('state')) {
+                    $adminDetails->wilaya_code = $request->state;
+                }
+                if ($request->has('office_address')) {
+                    $adminDetails->office_address = $request->office_address;
+                }
+                if ($request->has('office_location_lat')) {
+                    $adminDetails->office_location_lat = $request->office_location_lat;
+                }
+                if ($request->has('office_location_lng')) {
+                    $adminDetails->office_location_lng = $request->office_location_lng;
+                }
+                $adminDetails->save();
+            }
 
             DB::commit();
 
@@ -269,24 +311,7 @@ class GlobalAdminController extends Controller
      */
     public function deleteAdmin(int $adminId): JsonResponse
     {
-        // Ensure we're only deleting admin users
-        if (!in_array($admin->role, ['admin', 'global_admin'])) {
-            return response()->json([
-                'message' => 'User is not an admin',
-                'error' => 'Can only delete admin users'
-            ], 400);
-        }
-
-        // Prevent self-deletion
-        if ($admin->id === auth()->id()) {
-            return response()->json([
-                'message' => 'Cannot delete your own account',
-                'error' => 'Self-deletion not allowed'
-            ], 400);
-        }
-
         try {
-
             $admin = User::find($adminId);
             if (!$admin) {
                 return response()->json([
@@ -298,7 +323,29 @@ class GlobalAdminController extends Controller
                 ], 404);
             }
 
+            // Ensure we're only deleting admin users
+            if (!in_array($admin->role, ['admin', 'global_admin'])) {
+                return response()->json([
+                    'message' => 'User is not an admin',
+                    'error' => 'Can only delete admin users'
+                ], 400);
+            }
+
+            // Prevent self-deletion
+            if ($admin->id === auth()->id()) {
+                return response()->json([
+                    'message' => 'Cannot delete your own account',
+                    'error' => 'Self-deletion not allowed'
+                ], 400);
+            }
+
+            DB::beginTransaction();
+
+            // Delete admin details if present
+            Admin::where('user_id', $adminId)->delete();
             $deletedRows =  User::where('id', $adminId)->delete();
+
+            DB::commit();
 
             return response()->json([
                 'message' => $deletedRows === 1 ? 'Admin deleted successfully' : 'Admin not found or already deleted',
@@ -309,6 +356,7 @@ class GlobalAdminController extends Controller
             ]);
 
         } catch (\Exception $e) {
+            DB::rollBack();
             return response()->json([
                 'message' => 'Error deleting admin',
                 'error' => $e->getMessage()

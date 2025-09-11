@@ -289,12 +289,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Global Admin routes
     Route::prefix('global-admin')->middleware('global.admin')->group(function () {
-        // Admins management (use unified AdminController)
-        Route::get('/admins', [AdminController::class, 'index']);
-        Route::post('/admins', [AdminController::class, 'store']);
-        Route::get('/admins/{id}', [AdminController::class, 'show']);
-        Route::put('/admins/{id}', [AdminController::class, 'update']);
-        Route::delete('/admins/{id}', [AdminController::class, 'destroy']);
+        // Admins management (handled by GlobalAdminController)
+        Route::get('/admins', [GlobalAdminController::class, 'admins']);
+        Route::post('/admins', [GlobalAdminController::class, 'createAdmin']);
+        Route::put('/admins/{admin}', [GlobalAdminController::class, 'updateAdmin']);
+        Route::delete('/admins/{admin}', [GlobalAdminController::class, 'deleteAdmin']);
         
         Route::get('/terms-and-conditions', [GlobalAdminController::class, 'termsAndConditions']);
         Route::post('/terms-and-conditions', [GlobalAdminController::class, 'createTermsAndConditions']);
