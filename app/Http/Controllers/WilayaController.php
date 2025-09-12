@@ -66,7 +66,9 @@ class WilayaController extends Controller
         try {
             // Get wilayas with admins
             $withAdminsQuery = Wilaya::with(['admin.user', 'creator', 'updater'])
-                ->whereHas('admin');
+    ->whereHas('admin', function ($query) {
+        $query->whereColumn('admins.wilaya_code', 'wilayas.code');
+    });
                 
             // Get wilayas without admins
             $withoutAdminsQuery = Wilaya::with(['creator', 'updater'])
