@@ -44,7 +44,7 @@ class WilayaController extends Controller
                 }
             }
 
-            $wilayas = $query->orderBy('name_en')->paginate(20);
+            $wilayas = $query->orderByRaw('CAST(code AS UNSIGNED)')->get();
 
             return response()->json([
                 'success' => true,
@@ -93,9 +93,9 @@ class WilayaController extends Controller
                 $withoutAdminsQuery->where('is_active', $isActive);
             }
             $querywilayas = Wilaya::with(['admin.user', 'creator', 'updater']);
-            $wilayas = $querywilayas->orderByRaw('CAST(code AS UNSIGNED)')->paginate(20);
-            $wilayasWithAdmins = $withAdminsQuery->orderBy('code')->get();
-            $wilayasWithoutAdmins = $withoutAdminsQuery->orderBy('code')->get();
+            $wilayas = $querywilayas->orderByRaw('CAST(code AS UNSIGNED)')->get();
+            $wilayasWithAdmins = $withAdminsQuery->orderByRaw('CAST(code AS UNSIGNED)')->get();
+            $wilayasWithoutAdmins = $withoutAdminsQuery->orderByRaw('CAST(code AS UNSIGNED)')->get();
     
             return response()->json([
                 'success' => true,
