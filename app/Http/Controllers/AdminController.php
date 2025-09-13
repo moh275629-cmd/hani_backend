@@ -143,8 +143,8 @@ class AdminController extends Controller
     public function users(Request $request): JsonResponse
     {
         try {
-            $query = User::with(['loyaltyCards', 'stores']);
-            $currentUser = auth()->user();
+            $query = User::all();
+            $currentUser = User::auth();
 
             // Apply filters
             if ($request->has('search')) {
