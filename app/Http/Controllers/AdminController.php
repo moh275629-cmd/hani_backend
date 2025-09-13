@@ -144,7 +144,8 @@ class AdminController extends Controller
     {
         try {
             $query = User::all();
-            $currentUser = User::auth();
+            $currentUser = auth()->user();
+            
 
             // Apply filters
             if ($request->has('search')) {
