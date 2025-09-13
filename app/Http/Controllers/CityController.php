@@ -38,7 +38,7 @@ class CityController extends Controller
                 $query->where('is_active', $request->boolean('is_active'));
             }
 
-            $cities = $query->orderBy('name_en')->paginate(50);
+            $cities = $query->orderBy('name_en')->get();
 
             return response()->json([
                 'success' => true,
