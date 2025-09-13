@@ -469,7 +469,7 @@ class AdminController extends Controller
                 if ($adminWilayaCode) {
                     $allStores = $allStores->filter(function ($store) use ($adminWilayaCode) {
                         // Compare with store's state (which contains wilaya code)
-                        $matches = $store->state === $adminWilayaCode;
+                      $matches = $store->state === $adminWilayaCode;
                         if ($matches) {
                             \Log::info('Store matches wilaya filter', [
                                 'store_id' => $store->id,
@@ -960,10 +960,37 @@ class AdminController extends Controller
             if ($currentUser->isAdmin() && !$currentUser->isGlobalAdmin()) {
                 // Get the admin's wilaya code from the admins table
                 $admin = \App\Models\Admin::where('user_id', $currentUser->id)->first();
+                
+                \Log::info('Regional admin filtering offers', [
+                    'admin_user_id' => $currentUser->id,
+                    'admin_wilaya_code' => $admin ? $admin->wilaya_code : null,
+                    'total_offers_before_filter' => Offer::count()
+                ]);
+                
                 if ($admin && $admin->wilaya_code) {
-                    $query->whereHas('store', function($q) use ($admin) {
-                        $q->where('state', $admin->wilaya_code);
-                    });
+                    // First, let's see what stores exist for this wilaya
+                    $storesInWilaya = \App\Models\Store::where('state', $admin->wilaya_code)->get();
+                    \Log::info('Stores in admin wilaya', [
+                        'wilaya_code' => $admin->wilaya_code,
+                        'stores_count' => $storesInWilaya->count(),
+                        'store_ids' => $storesInWilaya->pluck('id')->toArray()
+                    ]);
+                    
+                    // Then see what offers exist for these stores
+                    $offersForStores = Offer::whereIn('store_id', $storesInWilaya->pluck('id'))->get();
+                    \Log::info('Offers for stores in wilaya', [
+                        'offers_count' => $offersForStores->count(),
+                        'offer_ids' => $offersForStores->pluck('id')->toArray()
+                    ]);
+                    
+                    // Use whereIn instead of whereHas for better performance and debugging
+                    $storeIds = $storesInWilaya->pluck('id')->toArray();
+                    if (empty($storeIds)) {
+                        // No stores in this wilaya, return no offers
+                        $query->where('id', 0);
+                    } else {
+                        $query->whereIn('store_id', $storeIds);
+                    }
                 } else {
                     // If no wilaya code found, return empty result
                     $query->where('id', 0); // This will return no results
@@ -988,6 +1015,14 @@ class AdminController extends Controller
             }
 
             $offers = $query->paginate($request->get('per_page', 15));
+            
+            \Log::info('Offers query results', [
+                'total_offers' => $offers->total(),
+                'current_page' => $offers->currentPage(),
+                'per_page' => $offers->perPage(),
+                'offers_count' => $offers->count(),
+                'offer_ids' => $offers->getCollection()->pluck('id')->toArray()
+            ]);
 
             // Ensure blob fields are not included in the response
             $offers->getCollection()->transform(function ($offer) {
