@@ -182,12 +182,12 @@ class AdminController extends Controller
                 
                 if ($adminWilayaCode) {
                     $allUsers = $allUsers->filter(function ($user) use ($adminWilayaCode) {
-                        // Compare with user's state_code (which should contain wilaya code)
-                        $matches = $user->state_code === $adminWilayaCode;
+                        // Compare with user's state (which contains wilaya code)
+                        $matches = $user->state === $adminWilayaCode;
                         if ($matches) {
                             \Log::info('User matches wilaya filter', [
                                 'user_id' => $user->id,
-                                'user_state_code' => $user->state_code,
+                                'user_state' => $user->state,
                                 'admin_wilaya_code' => $adminWilayaCode
                             ]);
                         }
@@ -207,7 +207,7 @@ class AdminController extends Controller
             // Apply state filter if provided (for global admins)
             if ($request->has('state')) {
                 $allUsers = $allUsers->filter(function ($user) use ($request) {
-                    return $user->state_code === $request->state;
+                    return $user->state === $request->state;
                 });
             }
             
@@ -1331,7 +1331,7 @@ class AdminController extends Controller
                 
                 if ($adminWilayaCode) {
                     $allReports = $allReports->filter(function ($report) use ($adminWilayaCode) {
-                        return $report->reportedUser && $report->reportedUser->state_code === $adminWilayaCode;
+                        return $report->reportedUser && $report->reportedUser->state === $adminWilayaCode;
                     });
                 } else {
                     // If no wilaya code found, return empty result
@@ -1342,7 +1342,7 @@ class AdminController extends Controller
             // Apply state filter for global admin if requested
             if ($currentUser->isGlobalAdmin() && $request->has('state') && $request->state !== 'all') {
                 $allReports = $allReports->filter(function ($report) use ($request) {
-                    return $report->reportedUser && $report->reportedUser->state_code === $request->state;
+                    return $report->reportedUser && $report->reportedUser->state === $request->state;
                 });
             }
             
