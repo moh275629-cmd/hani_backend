@@ -516,22 +516,13 @@ class AdminController extends Controller
                 ]);
             }
             
-            // Apply pagination
-            $perPage = $request->get('per_page', 15);
-            $page = $request->get('page', 1);
-            $total = $allStores->count();
-            $offset = ($page - 1) * $perPage;
+           
             
-            $paginatedStores = $allStores->slice($offset, $perPage);
+           
             
             $data = [
-                'data' => $paginatedStores->values(),
-                'current_page' => $page,
-                'per_page' => $perPage,
-                'total' => $total,
-                'last_page' => ceil($total / $perPage),
-                'from' => $offset + 1,
-                'to' => min($offset + $perPage, $total),
+                'data' => $allStores->values(),
+           
             ];
 
             return response()->json([
@@ -1014,7 +1005,7 @@ class AdminController extends Controller
                 $query->where('store_id', $request->store_id);
             }
 
-            $offers = $query->paginate($request->get('per_page', 15));
+            $offers = $query->get();
             
             \Log::info('Offers query results', [
                 'total_offers' => $offers->total(),
