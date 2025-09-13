@@ -23,7 +23,7 @@ class AdminController extends Controller
 {
     public function index()
     {
-        $admins = Admin::with(['user', 'wilaya'])->paginate(50);
+        $admins = Admin::with(['user', 'wilaya'])->get();
         return response()->json(['success' => true, 'data' => $admins]);
     }
 
@@ -1016,7 +1016,15 @@ class AdminController extends Controller
             
             return response()->json([
                 'message' => 'Offers retrieved successfully',
-                'data' => $offers
+                'data' => [
+                    'data' => $offers->items(),
+                    'current_page' => $offers->currentPage(),
+                    'per_page' => $offers->perPage(),
+                    'total' => $offers->total(),
+                    'last_page' => $offers->lastPage(),
+                    'from' => $offers->firstItem(),
+                    'to' => $offers->lastItem(),
+                ]
             ]);
             
 
