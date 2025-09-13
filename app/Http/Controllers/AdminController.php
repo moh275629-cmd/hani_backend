@@ -143,64 +143,51 @@ class AdminController extends Controller
     public function users(Request $request): JsonResponse
     {
         try {
-            $query = User::all();
+            $query = User::query();
             $currentUser = auth()->user();
-            
-
-            // Apply filters
+    
+            // Apply filters at DB level if possible
             if ($request->has('search')) {
                 $search = $request->search;
-                $query->searchByEncryptedFields($search);
+                $query->searchByEncryptedFields($search); // custom scope
             }
-
+    
             if ($request->has('role')) {
                 $query->where('role', $request->role);
             }
-
+    
             if ($request->has('status')) {
                 $query->where('is_active', $request->status === 'active');
             }
-
-            // Get all users first (since state is encrypted, we need to filter after decryption)
+    
+            // Fetch collection (needed for encrypted state filtering)
             $allUsers = $query->get();
-            
-            // Apply role-based filtering after decryption
+    
+            // Role-based filtering for regional admins
             if ($currentUser->isAdmin() && !$currentUser->isGlobalAdmin()) {
-                // Regional admin can only see users from their wilaya
-                $adminWilayaCode = null;
-                
-                // Get the admin's wilaya code from the admins table
                 $admin = \App\Models\Admin::where('user_id', $currentUser->id)->first();
-                if ($admin) {
-                    $adminWilayaCode = $admin->wilaya_code;
-                }
-                
+                $adminWilayaCode = $admin?->wilaya_code;
+    
                 if ($adminWilayaCode) {
-                    $allUsers = $allUsers->filter(function ($user) use ($adminWilayaCode) {
-                        // Compare with user's state (which should contain wilaya code)
-                        return $user->state === $adminWilayaCode;
-                    });
+                    $allUsers = $allUsers->filter(fn($user) => $user->state === $adminWilayaCode);
                 } else {
-                    // If no wilaya code found, return empty result
                     $allUsers = collect();
                 }
             }
-            
-            // Apply state filter if provided (for global admins)
+    
+            // Extra state filter (for global admins)
             if ($request->has('state')) {
-                $allUsers = $allUsers->filter(function ($user) use ($request) {
-                    return $user->state === $request->state;
-                });
+                $allUsers = $allUsers->filter(fn($user) => $user->state === $request->state);
             }
-            
-            // Apply pagination
+    
+            // Manual pagination
             $perPage = $request->get('per_page', 15);
             $page = $request->get('page', 1);
             $total = $allUsers->count();
             $offset = ($page - 1) * $perPage;
-            
+    
             $paginatedUsers = $allUsers->slice($offset, $perPage);
-            
+    
             $data = [
                 'data' => $paginatedUsers->values(),
                 'current_page' => $page,
@@ -210,12 +197,11 @@ class AdminController extends Controller
                 'from' => $offset + 1,
                 'to' => min($offset + $perPage, $total),
             ];
-
+    
             return response()->json([
                 'message' => 'Users retrieved successfully',
                 'data' => $data
             ]);
-
         } catch (\Exception $e) {
             return response()->json([
                 'message' => 'Error retrieving users',
@@ -223,7 +209,7 @@ class AdminController extends Controller
             ], 500);
         }
     }
-
+    
     /**
      * Get user details
      */
