@@ -140,76 +140,72 @@ class AdminController extends Controller
     /**
      * Get all users with pagination and filters
      */
-    public function users(Request $request): JsonResponse
-    {
-        try {
-            $query = User::query();
-            $currentUser = auth()->user();
-    
-            // Apply filters at DB level if possible
-            if ($request->has('search')) {
-                $search = $request->search;
-                $query->searchByEncryptedFields($search); // custom scope
-            }
-    
-            if ($request->has('role')) {
-                $query->where('role', $request->role);
-            }
-    
-            if ($request->has('status')) {
-                $query->where('is_active', $request->status === 'active');
-            }
-    
-            // Fetch collection (needed for encrypted state filtering)
-            $allUsers = $query->get();
-    
-            // Role-based filtering for regional admins
-            if ($currentUser->isAdmin() && !$currentUser->isGlobalAdmin()) {
-                $admin = \App\Models\Admin::where('user_id', $currentUser->id)->first();
-                $adminWilayaCode = $admin?->wilaya_code;
-    
-                if ($adminWilayaCode) {
-                    $allUsers = $allUsers->filter(fn($user) => $user->state === $adminWilayaCode);
-                } else {
-                    $allUsers = collect();
-                }
-            }
-    
-            // Extra state filter (for global admins)
-            if ($request->has('state')) {
-                $allUsers = $allUsers->filter(fn($user) => $user->state === $request->state);
-            }
-    
-            // Manual pagination
-            $perPage = $request->get('per_page', 15);
-            $page = $request->get('page', 1);
-            $total = $allUsers->count();
-            $offset = ($page - 1) * $perPage;
-    
-            $paginatedUsers = $allUsers->slice($offset, $perPage);
-    
-            $data = [
-                'data' => $paginatedUsers->values(),
-                'current_page' => $page,
-                'per_page' => $perPage,
-                'total' => $total,
-                'last_page' => ceil($total / $perPage),
-                'from' => $offset + 1,
-                'to' => min($offset + $perPage, $total),
-            ];
-    
-            return response()->json([
-                'message' => 'Users retrieved successfully',
-                'data' => $data
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Error retrieving users',
-                'error' => $e->getMessage()
-            ], 500);
+   public function users(Request $request): JsonResponse
+{
+    try {
+        $query = User::query();
+        $currentUser = auth()->user();
+
+        // Apply filters at DB level if possible
+        if ($request->has('search')) {
+            $search = $request->search;
+            $query->searchByEncryptedFields($search); // custom scope
         }
+
+        if ($request->has('role')) {
+            $query->where('role', $request->role);
+        }
+
+        if ($request->has('status')) {
+            $query->where('is_active', $request->status === 'active');
+        }
+
+       // Get all users first (since state is encrypted)
+$allUsers = $query->get();
+
+// If current user is a regional admin → restrict to his wilaya_code
+if ($currentUser->isAdmin() && !$currentUser->isGlobalAdmin()) {
+    $admin = \App\Models\Admin::where('user_id', $currentUser->id)->first();
+
+    if ($admin && $admin->wilaya_code) {
+        $wilayaCode = $admin->wilaya_code;
+
+        $allUsers = $allUsers->filter(fn($user) => $user->state === $wilayaCode);
+    } else {
+        // No wilaya assigned → no results
+        $allUsers = collect();
     }
-    
+}
+
+// If global admin → allow filtering by request->state
+if ($currentUser->isGlobalAdmin() && $request->has('state')) {
+    $stateFilter = $request->state;
+
+    $allUsers = $allUsers->filter(fn($user) => $user->state === $stateFilter);
+}
+
+
+       
+
+        ;
+
+        $data = [
+            'data' => $allUsers->values(),
+     
+        ];
+
+        return response()->json([
+            'message' => 'Users retrieved successfully',
+            'data' => $data
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'message' => 'Error retrieving users',
+            'error' => $e->getMessage()
+        ], 500);
+    }
+}
+
     /**
      * Get user details
      */
