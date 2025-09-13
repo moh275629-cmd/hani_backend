@@ -54,10 +54,7 @@ class City extends Model
         return $this->hasMany(Store::class, 'city', 'name_en');
     }
 
-    public function users()
-    {
-        return $this->hasMany(User::class, 'city', 'name_en');
-    }
+    // Note: Users don't have a direct city relationship, they use state (wilaya)
 
     // Scopes
     public function scopeActive($query)

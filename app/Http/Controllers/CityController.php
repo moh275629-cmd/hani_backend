@@ -99,7 +99,6 @@ class CityController extends Controller
     {
         try {
             $validator = Validator::make($request->all(), [
-                'code' => 'required|string|max:10|unique:cities,code',
                 'name_en' => 'required|string|max:255',
                 'name_fr' => 'required|string|max:255',
                 'name_ar' => 'required|string|max:255',
@@ -115,8 +114,11 @@ class CityController extends Controller
                 ], 422);
             }
 
+            // Generate unique city code
+            $cityCode = $this->generateCityCode($request->wilaya_code);
+            
             $city = City::createCity([
-                'code' => $request->code,
+                'code' => $cityCode,
                 'name_en' => $request->name_en,
                 'name_fr' => $request->name_fr,
                 'name_ar' => $request->name_ar,
@@ -194,11 +196,11 @@ class CityController extends Controller
         try {
             $city = City::findOrFail($id);
 
-            // Check if city has stores or users
-            if ($city->stores()->count() > 0 || $city->users()->count() > 0) {
+            // Check if city has stores (users don't have city relationship)
+            if ($city->stores()->count() > 0) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Cannot delete city with existing stores or users'
+                    'message' => 'Cannot delete city with existing stores'
                 ], 400);
             }
 
@@ -252,5 +254,31 @@ class CityController extends Controller
                 'message' => 'Failed to search cities: ' . $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Generate unique city code
+     */
+    private function generateCityCode($wilayaCode)
+    {
+        // Get the highest city code for this wilaya
+        $lastCity = City::where('wilaya_code', $wilayaCode)
+            ->orderBy('code', 'desc')
+            ->first();
+        
+        if ($lastCity) {
+            $lastCode = (int) $lastCity->code;
+            $newCode = $lastCode + 1;
+        } else {
+            // First city in this wilaya
+            $newCode = (int) $wilayaCode * 1000 + 1;
+        }
+        
+        // Ensure code is unique
+        while (City::where('code', (string) $newCode)->exists()) {
+            $newCode++;
+        }
+        
+        return (string) $newCode;
     }
 }
