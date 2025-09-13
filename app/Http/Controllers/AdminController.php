@@ -1006,21 +1006,26 @@ class AdminController extends Controller
             }
 
             $offers = $query->get();
+
+            \Log::info('Offers query results', [
+                'offers_count' => $offers->count(),
+                'offer_ids' => $offers->pluck('id')->toArray()
+            ]);
             
-          
             // Ensure blob fields are not included in the response
-            $offers->getCollection()->transform(function ($offer) {
+            $offers->transform(function ($offer) {
                 $offer->makeHidden(['image_blob']);
                 if ($offer->store) {
                     $offer->store->makeHidden(['logo_blob', 'banner_blob']);
                 }
                 return $offer;
             });
-
+            
             return response()->json([
                 'message' => 'Offers retrieved successfully',
                 'data' => $offers
             ]);
+            
 
         } catch (\Exception $e) {
             return response()->json([
