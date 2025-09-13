@@ -38,7 +38,7 @@ class CityController extends Controller
                 $query->where('is_active', $request->boolean('is_active'));
             }
 
-            $cities = $query->orderBy('name_en')->get();
+            $cities = $query->orderByRaw('CAST(code AS UNSIGNED)')->get();
 
             return response()->json([
                 'success' => true,
@@ -240,8 +240,7 @@ class CityController extends Controller
 
             $cities = $citiesQuery->where('is_active', true)
                                  ->with('wilaya')
-                                 ->orderBy('name_en')
-                                 ->limit(20)
+                                 ->orderByRaw('CAST(code AS UNSIGNED)')
                                  ->get();
 
             return response()->json([
