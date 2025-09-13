@@ -1007,14 +1007,7 @@ class AdminController extends Controller
 
             $offers = $query->get();
             
-            \Log::info('Offers query results', [
-                'total_offers' => $offers->total(),
-                'current_page' => $offers->currentPage(),
-                'per_page' => $offers->perPage(),
-                'offers_count' => $offers->count(),
-                'offer_ids' => $offers->getCollection()->pluck('id')->toArray()
-            ]);
-
+          
             // Ensure blob fields are not included in the response
             $offers->getCollection()->transform(function ($offer) {
                 $offer->makeHidden(['image_blob']);
