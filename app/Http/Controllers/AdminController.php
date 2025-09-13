@@ -452,11 +452,39 @@ class AdminController extends Controller
                     $adminWilayaCode = $admin->wilaya_code;
                 }
                 
+                \Log::info('Regional admin filtering stores', [
+                    'admin_user_id' => $currentUser->id,
+                    'admin_wilaya_code' => $adminWilayaCode,
+                    'total_stores_before_filter' => $allStores->count(),
+                    'sample_stores' => $allStores->take(3)->map(function($store) {
+                        return [
+                            'store_id' => $store->id,
+                            'store_name' => $store->store_name,
+                            'state' => $store->state,
+                            'state_code' => $store->state_code
+                        ];
+                    })->toArray()
+                ]);
+                
                 if ($adminWilayaCode) {
                     $allStores = $allStores->filter(function ($store) use ($adminWilayaCode) {
-                        // Compare with store's state_code (which should contain wilaya code)
-                        return $store->state_code === $adminWilayaCode;
+                        // Compare with store's state (which contains wilaya code)
+                        $matches = $store->state === $adminWilayaCode;
+                        if ($matches) {
+                            \Log::info('Store matches wilaya filter', [
+                                'store_id' => $store->id,
+                                'store_name' => $store->store_name,
+                                'store_state' => $store->state,
+                                'admin_wilaya_code' => $adminWilayaCode
+                            ]);
+                        }
+                        return $matches;
                     });
+                    
+                    \Log::info('Wilaya filtering results for stores', [
+                        'matching_stores' => $allStores->count(),
+                        'admin_wilaya_code' => $adminWilayaCode
+                    ]);
                 } else {
                     // If no wilaya code found, return empty result
                     $allStores = collect();
