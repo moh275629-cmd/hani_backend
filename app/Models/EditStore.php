@@ -40,6 +40,9 @@ class EditStore extends Model
         'user_name',
         'user_phone',
         'user_state',
+        'is_wilaya_change',
+        'current_wilaya_code',
+        'target_wilaya_code',
     ];
 
     protected $casts = [
@@ -47,6 +50,7 @@ class EditStore extends Model
         'payment_methods' => 'array',
         'services' => 'array',
         'reviewed_at' => 'datetime',
+        'is_wilaya_change' => 'boolean',
     ];
 
     protected $encryptable = [
@@ -236,5 +240,32 @@ class EditStore extends Model
     public function isRejected()
     {
         return $this->status === 'rejected';
+    }
+
+    public function isWilayaChange()
+    {
+        return $this->is_wilaya_change === true;
+    }
+
+    public function getCurrentWilayaCode()
+    {
+        return $this->current_wilaya_code;
+    }
+
+    public function getTargetWilayaCode()
+    {
+        return $this->target_wilaya_code;
+    }
+
+    // Scope for wilaya change requests
+    public function scopeWilayaChanges($query)
+    {
+        return $query->where('is_wilaya_change', true);
+    }
+
+    // Scope for regular edit requests
+    public function scopeRegularEdits($query)
+    {
+        return $query->where('is_wilaya_change', false);
     }
 }

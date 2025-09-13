@@ -82,6 +82,18 @@ class EditStoreController extends Controller
                 'message' => 'You already have a pending edit request'
             ], 400);
         }
+
+        // Check if this is a wilaya change request
+        $currentStateCode = $store->state_code;
+        $newStateCode = $request->input('state_code');
+        $isWilayaChange = $currentStateCode && $newStateCode && $currentStateCode !== $newStateCode;
+        
+        \Log::info('Wilaya change check:', [
+            'current_state_code' => $currentStateCode,
+            'new_state_code' => $newStateCode,
+            'is_wilaya_change' => $isWilayaChange
+        ]);
+
         $authUser = Auth::user();
 
         // Prepare user data as JSON (optional, for storing additional info)
@@ -114,6 +126,9 @@ class EditStoreController extends Controller
             'user_name'=>$request->input('user_name'),
             'user_phone'=>$request->input('user_phone'),
             'user_state'=>$request->input('user_state'),
+            'is_wilaya_change' => $isWilayaChange,
+            'current_wilaya_code' => $currentStateCode,
+            'target_wilaya_code' => $newStateCode,
         ]);
 
         \Log::info('Edit request created successfully. Request ID: ' . $editRequest->id);
@@ -210,7 +225,15 @@ class EditStoreController extends Controller
             ->where('status', 'pending');
 
         if ($wilayaCode) {
-            $query->where('state_code', $wilayaCode);
+            // For wilaya changes, show requests where target_wilaya_code matches admin's wilaya
+            // For regular requests, show requests where state_code matches admin's wilaya
+            $query->where(function($q) use ($wilayaCode) {
+                $q->where('target_wilaya_code', $wilayaCode) // Wilaya change requests
+                  ->orWhere(function($subQ) use ($wilayaCode) {
+                      $subQ->where('is_wilaya_change', false)
+                           ->where('state_code', $wilayaCode); // Regular requests
+                  });
+            });
         }
 
         $requests = $query->orderBy('created_at', 'desc')->get();
