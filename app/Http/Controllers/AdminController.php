@@ -165,10 +165,24 @@ class AdminController extends Controller
             
             // Apply role-based filtering after decryption
             if ($currentUser->isAdmin() && !$currentUser->isGlobalAdmin()) {
-                // Regional admin can only see users from their state
-                $allUsers = $allUsers->filter(function ($user) use ($currentUser) {
-                    return $user->state === $currentUser->state;
-                });
+                // Regional admin can only see users from their wilaya
+                $adminWilayaCode = null;
+                
+                // Get the admin's wilaya code from the admins table
+                $admin = \App\Models\Admin::where('user_id', $currentUser->id)->first();
+                if ($admin) {
+                    $adminWilayaCode = $admin->wilaya_code;
+                }
+                
+                if ($adminWilayaCode) {
+                    $allUsers = $allUsers->filter(function ($user) use ($adminWilayaCode) {
+                        // Compare with user's state (which should contain wilaya code)
+                        return $user->state === $adminWilayaCode;
+                    });
+                } else {
+                    // If no wilaya code found, return empty result
+                    $allUsers = collect();
+                }
             }
             
             // Apply state filter if provided (for global admins)
@@ -410,10 +424,24 @@ class AdminController extends Controller
             
             // Apply role-based filtering after decryption
             if ($currentUser->isAdmin() && !$currentUser->isGlobalAdmin()) {
-                // Local admin can only see stores whose owner is in same state
-                $allStores = $allStores->filter(function ($store) use ($currentUser) {
-                    return $store->owner && $store->owner->state === $currentUser->state;
-                });
+                // Regional admin can only see stores from their wilaya
+                $adminWilayaCode = null;
+                
+                // Get the admin's wilaya code from the admins table
+                $admin = \App\Models\Admin::where('user_id', $currentUser->id)->first();
+                if ($admin) {
+                    $adminWilayaCode = $admin->wilaya_code;
+                }
+                
+                if ($adminWilayaCode) {
+                    $allStores = $allStores->filter(function ($store) use ($adminWilayaCode) {
+                        // Compare with store's state_code (which should contain wilaya code)
+                        return $store->state_code === $adminWilayaCode;
+                    });
+                } else {
+                    // If no wilaya code found, return empty result
+                    $allStores = collect();
+                }
             }
             
             // Apply state filter if provided (for global admins)
@@ -881,12 +909,18 @@ class AdminController extends Controller
             $query = Offer::with(['store', 'store.owner']);
 
             $currentUser = auth()->user();
-            // Local admin: restrict offers to stores whose owner is in same state
+            // Regional admin: restrict offers to stores from their wilaya
             if ($currentUser->isAdmin() && !$currentUser->isGlobalAdmin()) {
-                $query->whereHas('store.owner', function($q) use ($currentUser) {
-                    $q->where('state', $currentUser->state);
-                    
-                });
+                // Get the admin's wilaya code from the admins table
+                $admin = \App\Models\Admin::where('user_id', $currentUser->id)->first();
+                if ($admin && $admin->wilaya_code) {
+                    $query->whereHas('store', function($q) use ($admin) {
+                        $q->where('state_code', $admin->wilaya_code);
+                    });
+                } else {
+                    // If no wilaya code found, return empty result
+                    $query->where('id', 0); // This will return no results
+                }
             }
 
             // Apply filters
@@ -1267,10 +1301,23 @@ class AdminController extends Controller
             
             // Apply role-based filtering after decryption
             if ($currentUser->isAdmin() && !$currentUser->isGlobalAdmin()) {
-                // Regional admin can only see reports from users in their state
-                $allReports = $allReports->filter(function ($report) use ($currentUser) {
-                    return $report->reportedUser && $report->reportedUser->state === $currentUser->state;
-                });
+                // Regional admin can only see reports from users in their wilaya
+                $adminWilayaCode = null;
+                
+                // Get the admin's wilaya code from the admins table
+                $admin = \App\Models\Admin::where('user_id', $currentUser->id)->first();
+                if ($admin) {
+                    $adminWilayaCode = $admin->wilaya_code;
+                }
+                
+                if ($adminWilayaCode) {
+                    $allReports = $allReports->filter(function ($report) use ($adminWilayaCode) {
+                        return $report->reportedUser && $report->reportedUser->state === $adminWilayaCode;
+                    });
+                } else {
+                    // If no wilaya code found, return empty result
+                    $allReports = collect();
+                }
             }
             
             // Apply state filter for global admin if requested
