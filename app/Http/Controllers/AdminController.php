@@ -953,7 +953,7 @@ class AdminController extends Controller
     public function offers(Request $request): JsonResponse
     {
         try {
-            $query = Offer::with(['store', 'store.owner']);
+            $query = Offer::with(['store']);
 
             $currentUser = auth()->user();
             // Regional admin: restrict offers to stores from their wilaya
@@ -962,7 +962,7 @@ class AdminController extends Controller
                 $admin = \App\Models\Admin::where('user_id', $currentUser->id)->first();
                 if ($admin && $admin->wilaya_code) {
                     $query->whereHas('store', function($q) use ($admin) {
-                        $q->where('state_code', $admin->wilaya_code);
+                        $q->where('state', $admin->wilaya_code);
                     });
                 } else {
                     // If no wilaya code found, return empty result
