@@ -960,19 +960,12 @@ class AdminController extends Controller
                 
                 if ($admin && $admin->wilaya_code) {
                     // First, let's see what stores exist for this wilaya
-                    $storesInWilaya = \App\Models\Store::where('state', $admin->wilaya_code)->get();
-                    \Log::info('Stores in admin wilaya', [
-                        'wilaya_code' => $admin->wilaya_code,
-                        'stores_count' => $storesInWilaya->count(),
-                        'store_ids' => $storesInWilaya->pluck('id')->toArray()
-                    ]);
-                    
+                    $storesInWilaya = \App\Models\Store::all()->filter(function ($store) use ($admin) {
+                        return $store->state === $admin->wilaya_code;
+                    });  
                     // Then see what offers exist for these stores
                     $offersForStores = Offer::whereIn('store_id', $storesInWilaya->pluck('id'))->get();
-                    \Log::info('Offers for stores in wilaya', [
-                        'offers_count' => $offersForStores->count(),
-                        'offer_ids' => $offersForStores->pluck('id')->toArray()
-                    ]);
+                   
                     
                     // Use whereIn instead of whereHas for better performance and debugging
                     $storeIds = $storesInWilaya->pluck('id')->toArray();
