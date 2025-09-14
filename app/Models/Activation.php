@@ -57,9 +57,7 @@ class Activation extends Model
 
     public function isExpiringSoon($days = 7)
     {
-        return $this->deactivate_at && 
-               $this->deactivate_at->isFuture() && 
-               $this->deactivate_at->diffInDays(now()) <= $days;
+        return $this->deactivate_at->diffInDays(now()) <= $days;
     }
 
     public function daysUntilExpiration()
