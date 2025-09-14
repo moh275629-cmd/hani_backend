@@ -64,10 +64,21 @@ class Activation extends Model
 
     public function daysUntilExpiration()
     {
-        if (!$this->deactivate_at || $this->isExpired()) {
+        if (!$this->deactivate_at) {
             return 0;
         }
-        return $this->deactivate_at->diffInDays(now());
+        
+        if ($this->isExpired()) {
+            return 0;
+        }
+        
+        // Calculate days remaining (positive number)
+        $now = now();
+        if ($this->deactivate_at->isFuture()) {
+            return $now->diffInDays($this->deactivate_at, false);
+        }
+        
+        return 0;
     }
 
     public function extendActivation($days = 365)
