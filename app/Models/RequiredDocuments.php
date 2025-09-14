@@ -4,10 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Traits\Encryptable;
 
 class RequiredDocuments extends Model
 {
-    use HasFactory;
+    use HasFactory, Encryptable;
 
     protected $table = 'required_documents';
 
@@ -26,6 +27,15 @@ class RequiredDocuments extends Model
         'is_active',
         'display_order',
         'notes',
+    ];
+
+    protected $encryptable = [
+        'name_ar',
+        'name_fr',
+        'name_en',
+        'description_ar',
+        'description_fr',
+        'description_en',
     ];
 
     protected $casts = [
