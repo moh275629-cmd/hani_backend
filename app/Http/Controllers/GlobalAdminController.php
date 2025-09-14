@@ -369,21 +369,21 @@ class GlobalAdminController extends Controller
                 ], 404);
             }
 
-            // Ensure we're only deleting admin users
-            if (!in_array($admin->role, ['admin', 'global_admin'])) {
-                return response()->json([
-                    'message' => 'User is not an admin',
-                    'error' => 'Can only delete admin users'
-                ], 400);
-            }
+        // Ensure we're only deleting admin users
+        if (!in_array($admin->role, ['admin', 'global_admin'])) {
+            return response()->json([
+                'message' => 'User is not an admin',
+                'error' => 'Can only delete admin users'
+            ], 400);
+        }
 
-            // Prevent self-deletion
-            if ($admin->id === auth()->id()) {
-                return response()->json([
-                    'message' => 'Cannot delete your own account',
-                    'error' => 'Self-deletion not allowed'
-                ], 400);
-            }
+        // Prevent self-deletion
+        if ($admin->id === auth()->id()) {
+            return response()->json([
+                'message' => 'Cannot delete your own account',
+                'error' => 'Self-deletion not allowed'
+            ], 400);
+        }
 
             DB::beginTransaction();
 

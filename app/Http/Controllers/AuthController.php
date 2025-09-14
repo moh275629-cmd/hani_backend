@@ -437,10 +437,23 @@ class AuthController extends Controller
         try {
             \Log::info('Profile endpoint called for user: ' . $request->user()->id);
             
-            $user = $request->user();
+            $user = $request->user()->load('activation');
             
             \Log::info('User retrieved successfully: ' . $user->email);
             \Log::info('User profile_image: ' . ($user->profile_image ?? 'null'));
+            
+            // Calculate activation information
+            $activationInfo = null;
+            if ($user->activation) {
+                $activationInfo = [
+                    'is_active' => $user->activation->isActive(),
+                    'is_expired' => $user->activation->isExpired(),
+                    'is_expiring_soon' => $user->activation->isExpiringSoon(7),
+                    'days_remaining' => $user->activation->daysUntilExpiration(),
+                    'approved_at' => $user->activation->approved_at,
+                    'deactivate_at' => $user->activation->deactivate_at,
+                ];
+            }
             
             // Simple test response first
             $response = [
@@ -455,6 +468,8 @@ class AuthController extends Controller
                     'state_code' => $user->state_code,
                     'profile_image' => $user->profile_image,
                     'is_active' => $user->is_active,
+                    'is_approved' => $user->is_approved,
+                    'created_at' => $user->created_at,
                 ],
                 'loyalty_card' => null,
                 'id_verification' => [
@@ -462,6 +477,7 @@ class AuthController extends Controller
                     'verified_at' => $user->id_verified_at,
                     'extracted_data' => $user->id_verification_data,
                 ],
+                'activation' => $activationInfo,
             ];
             
             \Log::info('Profile response ready, returning JSON');
