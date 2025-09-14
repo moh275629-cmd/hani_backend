@@ -18,6 +18,7 @@ use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ActivationController;
 use App\Http\Controllers\WilayaController;
 use App\Http\Controllers\CityController;
+use App\Http\Controllers\RequiredDocumentsController;
 
 
 // Public routes
@@ -276,6 +277,17 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/pending-client-approvals', [AdminController::class, 'getPendingClientApprovals']);
         Route::post('/clients/{userId}/approve', [AdminController::class, 'approveClient']);
         
+        // Admin Profile Management
+        Route::put('/admin/profile/{adminId}', [AdminController::class, 'updateProfile']);
+        
+        // Business Type Management
+        Route::get('/business-types', [App\Http\Controllers\BusinessTypeController::class, 'index']);
+        Route::get('/business-types/dropdown', [App\Http\Controllers\BusinessTypeController::class, 'getForDropdown']);
+        Route::post('/business-types', [App\Http\Controllers\BusinessTypeController::class, 'store']);
+        Route::put('/business-types/{id}', [App\Http\Controllers\BusinessTypeController::class, 'update']);
+        Route::delete('/business-types/{id}', [App\Http\Controllers\BusinessTypeController::class, 'destroy']);
+        Route::post('/stores/{storeId}/approve-custom-business-type', [App\Http\Controllers\BusinessTypeController::class, 'approveCustomType']);
+        
         // Store Edit Request Management
         Route::get('/store-edit-requests', [App\Http\Controllers\EditStoreController::class, 'adminIndex']);
         Route::get('/store-edit-requests/{id}', [App\Http\Controllers\EditStoreController::class, 'adminShow']);
@@ -463,4 +475,22 @@ Route::post('/test-png-upload', function (Request $request) {
             'error' => $e->getMessage()
         ], 500);
     }
+});
+
+// Required Documents routes
+Route::middleware('auth:sanctum')->group(function () {
+    // Admin routes for managing required documents
+    Route::middleware('admin')->group(function () {
+        Route::get('/admin/required-documents', [RequiredDocumentsController::class, 'index']);
+        Route::post('/admin/required-documents', [RequiredDocumentsController::class, 'store']);
+        Route::put('/admin/required-documents/{id}', [RequiredDocumentsController::class, 'update']);
+        Route::delete('/admin/required-documents/{id}', [RequiredDocumentsController::class, 'destroy']);
+        Route::get('/admin/required-documents/types', [RequiredDocumentsController::class, 'getDocumentTypes']);
+        Route::get('/admin/required-documents/categories', [RequiredDocumentsController::class, 'getUserCategories']);
+        Route::get('/admin/required-documents/file-types', [RequiredDocumentsController::class, 'getFileTypes']);
+    });
+    
+    // Public routes for getting documents by category
+    Route::get('/required-documents/category/{category}', [RequiredDocumentsController::class, 'getForCategory']);
+    Route::get('/required-documents/required/{category}', [RequiredDocumentsController::class, 'getRequiredForCategory']);
 });

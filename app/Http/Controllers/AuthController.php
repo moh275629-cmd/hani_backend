@@ -8,6 +8,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use App\Mail\WelcomeClientMail;
+use App\Mail\WelcomeStoreMail;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rules\Password;
 
@@ -368,6 +370,20 @@ class AuthController extends Controller
                     }
                     // Reload store
                     $store = $store ?: \App\Models\Store::where('user_id', $user->id)->first();
+                }
+                
+                // Send welcome email after OTP verification
+                try {
+                    $adminInfo = $this->_getAdminInfoForUser($user);
+                    
+                    if ($user->role === 'client') {
+                        Mail::to($user->email)->send(new WelcomeClientMail($user, $adminInfo));
+                    } elseif ($user->role === 'store' && $store) {
+                        Mail::to($user->email)->send(new WelcomeStoreMail($user, $store, $adminInfo));
+                    }
+                } catch (\Exception $e) {
+                    \Log::error('Failed to send welcome email: ' . $e->getMessage());
+                    // Don't fail the OTP verification if email fails
                 }
                 
                 // Create authentication token only for approved users or non-client users
@@ -937,5 +953,33 @@ class AuthController extends Controller
         }
     }
 
-
+    /**
+     * Get admin information for a user based on their state/wilaya
+     */
+    private function _getAdminInfoForUser(\App\Models\User $user)
+    {
+        try {
+            // Find admin for the user's state/wilaya
+            $admin = \App\Models\Admin::where('wilaya_code', $user->state)->first();
+            
+            if ($admin) {
+                $adminUser = \App\Models\User::find($admin->user_id);
+                if ($adminUser) {
+                    return [
+                        'name' => $adminUser->name,
+                        'email' => $adminUser->email,
+                        'phone' => $adminUser->phone,
+                        'office_address' => $admin->office_address,
+                        'office_location_lat' => $admin->office_location_lat,
+                        'office_location_lng' => $admin->office_location_lng,
+                    ];
+                }
+            }
+            
+            return null;
+        } catch (\Exception $e) {
+            \Log::error('Failed to get admin info for user: ' . $e->getMessage());
+            return null;
+        }
+    }
 }

@@ -87,6 +87,76 @@ class AdminController extends Controller
         $admin->delete();
         return response()->json(['success' => true]);
     }
+
+    /**
+     * Update admin profile (for wilaya admins to update their own profile)
+     */
+    public function updateProfile(Request $request, $adminId): JsonResponse
+    {
+        try {
+            $admin = User::find($adminId);
+            
+            if (!$admin) {
+                return response()->json([
+                    'message' => 'Admin not found',
+                    'updated' => false,
+                    'id' => $adminId,
+                ], 404);
+            }
+
+            // Ensure the user is an admin
+            if ($admin->role !== 'admin') {
+                return response()->json([
+                    'message' => 'User is not an admin',
+                    'updated' => false,
+                    'id' => $adminId,
+                ], 403);
+            }
+
+            $validator = Validator::make($request->all(), [
+                'name' => 'sometimes|required|string|max:255',
+                'email' => 'sometimes|required|email|unique:users,email,' . $adminId,
+                'phone' => 'nullable|string|max:20',
+                'office_address' => 'nullable|string|max:500',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            DB::beginTransaction();
+
+            $updateData = $request->only(['name', 'email', 'phone']);
+            $admin->update($updateData);
+
+            // Update admin-specific details if they exist
+            $adminDetails = Admin::where('user_id', $adminId)->first();
+            if ($adminDetails && $request->has('office_address')) {
+                $adminDetails->update([
+                    'office_address' => $request->office_address
+                ]);
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Admin profile updated successfully',
+                'data' => $admin->fresh(),
+                'updated' => true,
+                'id' => $adminId,
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Error updating admin profile',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
     /**
      * Get admin dashboard statistics
      */
@@ -516,7 +586,7 @@ class AdminController extends Controller
                 ]);
             }
             
-           
+            
             
            
             
@@ -1001,17 +1071,17 @@ class AdminController extends Controller
             $offers = $query->get();
 
 $offers->transform(function ($offer) {
-    $offer->makeHidden(['image_blob']);
-    if ($offer->store) {
-        $offer->store->makeHidden(['logo_blob', 'banner_blob']);
-    }
-    return $offer;
-});
+                $offer->makeHidden(['image_blob']);
+                if ($offer->store) {
+                    $offer->store->makeHidden(['logo_blob', 'banner_blob']);
+                }
+                return $offer;
+            });
 
-return response()->json([
-    'message' => 'Offers retrieved successfully',
-    'data' => $offers
-]);
+            return response()->json([
+                'message' => 'Offers retrieved successfully',
+                'data' => $offers
+            ]);
     
 
         } catch (\Exception $e) {

@@ -15,6 +15,8 @@ class Store extends Model
         'store_name',
         'description',
         'business_type',
+        'custom_business_type',
+        'has_custom_business_type',
         'phone',
         'email',
         'website',
@@ -50,6 +52,7 @@ class Store extends Model
         'store_name',
         'description',
         'business_type',
+        'custom_business_type',
         'phone',
         'email',
         'website',
@@ -65,6 +68,7 @@ class Store extends Model
     protected $casts = [
         'is_approved' => 'boolean',
         'is_active' => 'boolean',
+        'has_custom_business_type' => 'boolean',
         'business_hours' => 'array',
         'payment_methods' => 'array',
         'services' => 'array',
@@ -83,6 +87,11 @@ class Store extends Model
     public function owner()
     {
         return $this->belongsTo(User::class, 'user_id');
+    }
+
+    public function businessTypeModel()
+    {
+        return $this->belongsTo(BusinessType::class, 'business_type', 'key');
     }
 
     
