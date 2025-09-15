@@ -113,31 +113,33 @@ class DocumentController extends Controller
                 'email' => 'required_without:phone|email|nullable',
                 'phone' => 'required_without:email|string|nullable',
                 'password' => 'required|string',
+                'documents' => 'required|array',
+                'documents.*' => 'file|mimes:pdf|max:20480', // Changed to accept only PDF
                 'names' => 'array|nullable',
                 'names.*' => 'string|nullable',
                 'descriptions' => 'array|nullable',
                 'descriptions.*' => 'string|nullable',
             ]);
-
+    
             if ($validator->fails()) {
                 return response()->json([
                     'message' => 'Validation error',
                     'errors' => $validator->errors(),
                 ], 422);
             }
-
+    
             if (empty($request->email) && empty($request->phone)) {
                 return response()->json([
                     'message' => 'Validation error',
                     'errors' => ['Either email or phone must be provided'],
                 ], 422);
             }
-
+    
             // Because email/phone are encrypted at rest, fetch candidates then match on decrypted getters
             $candidateUsers = User::query()
                 ->select(['id', 'email', 'phone', 'password'])
                 ->get();
-
+    
             $user = null;
             if (!empty($request->email)) {
                 $needle = strtolower(trim($request->email));
@@ -151,91 +153,47 @@ class DocumentController extends Controller
                     return $phone === $needle;
                 });
             }
-
+    
             if (!$user) {
                 return response()->json([
                     'message' => 'User not found with the provided credentials',
                 ], 404);
             }
-
+    
             if (!Hash::check($request->password, $user->password)) {
                 return response()->json([
                     'message' => 'Invalid password',
                 ], 401);
             }
-
-            // Collect files
-            $normalizedFiles = [];
-            if ($request->hasFile('documents')) {
-                $files = $request->file('documents');
-                if (is_array($files)) {
-                    $normalizedFiles = $files;
-                } elseif ($files !== null) {
-                    $normalizedFiles = [$files];
+    
+            // Handle documents upload
+            $uploaded = [];
+            $documents = $request->file('documents');
+    
+            foreach ($documents as $index => $file) {
+                if (!$file->isValid()) {
+                    throw new \Exception('Invalid file uploaded');
                 }
-            } else {
-                foreach ($request->allFiles() as $key => $value) {
-                    if (str_starts_with($key, 'documents')) {
-                        if (is_array($value)) {
-                            foreach ($value as $f) { $normalizedFiles[] = $f; }
-                        } else {
-                            $normalizedFiles[] = $value;
-                        }
-                    }
-                }
-            }
-
-            if (empty($normalizedFiles)) {
-                return response()->json([
-                    'message' => 'No documents found in request',
-                ], 400);
-            }
-
-            foreach ($normalizedFiles as $f) {
-                if (!$f->isValid()) {
+    
+                // Additional PDF validation
+                $mimeType = $file->getMimeType();
+                $extension = strtolower($file->getClientOriginalExtension());
+                
+                if ($mimeType !== 'application/pdf' || $extension !== 'pdf') {
                     return response()->json([
-                        'message' => 'One or more files are invalid',
-                    ], 400);
-                }
-                $mime = $f->getClientMimeType();
-                $extension = strtolower($f->getClientOriginalExtension());
-                $sizeKb = (int) ceil($f->getSize() / 1024);
-                
-                // Log for debugging
-                Log::info('File validation', [
-                    'filename' => $f->getClientOriginalName(),
-                    'mime_type' => $mime,
-                    'extension' => $extension,
-                    'size_kb' => $sizeKb
-                ]);
-                
-                // Check both MIME type and file extension for more flexibility
-                $allowedMimes = ['application/pdf'];
-                $allowedExtensions = [ 'pdf'];
-                
-                if (!in_array($mime, $allowedMimes) && !in_array($extension, $allowedExtensions)) {
-                    return response()->json([
-                        'message' => 'Unsupported file type. Detected MIME: ' . $mime . ', Extension: ' . $extension,
+                        'message' => 'Only PDF files are allowed. Uploaded file type: ' . $mimeType,
                     ], 415);
                 }
-                if ($sizeKb > 20480) {
-                    return response()->json([
-                        'message' => 'File too large (max 20MB)',
-                    ], 413);
-                }
-            }
-
-            $uploaded = [];
-            foreach ($normalizedFiles as $index => $file) {
+    
                 $storedPath = $file->store("documents/{$user->id}", 'public');
-
+    
                 $doc = Document::create([
                     'user_id' => $user->id,
                     'name' => $request->input("names.$index") ?? $file->getClientOriginalName(),
                     'description' => $request->input("descriptions.$index", ''),
                     'file_path' => $storedPath,
                 ]);
-
+    
                 $uploaded[] = [
                     'id' => $doc->id,
                     'name' => $doc->name,
@@ -245,12 +203,12 @@ class DocumentController extends Controller
                     'user_id' => $user->id,
                 ];
             }
-
+    
             return response()->json([
                 'message' => 'Documents uploaded successfully',
                 'data' => $uploaded,
             ]);
-
+    
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
                 'message' => 'Validation error',
@@ -261,7 +219,7 @@ class DocumentController extends Controller
                 'trace' => $e->getTraceAsString(),
                 'request' => $request->except(['password', 'documents'])
             ]);
-
+    
             return response()->json([
                 'message' => 'Server Error',
                 'error' => config('app.debug') ? $e->getMessage() : 'Internal server error',
