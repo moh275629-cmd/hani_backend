@@ -210,8 +210,8 @@ class DocumentController extends Controller
                 ]);
                 
                 // Check both MIME type and file extension for more flexibility
-                $allowedMimes = ['image/jpeg', 'image/png', 'application/pdf'];
-                $allowedExtensions = ['jpg', 'jpeg', 'png', 'pdf'];
+                $allowedMimes = ['application/pdf'];
+                $allowedExtensions = [ 'pdf'];
                 
                 if (!in_array($mime, $allowedMimes) && !in_array($extension, $allowedExtensions)) {
                     return response()->json([
