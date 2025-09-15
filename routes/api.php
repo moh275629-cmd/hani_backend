@@ -333,6 +333,11 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/{id}/statistics', [WilayaController::class, 'statistics']);
         });
         
+        // Documents management (Admin)
+        Route::prefix('documents')->group(function () {
+            Route::get('/user/{userId}', [App\Http\Controllers\DocumentController::class, 'listByUser']);
+        });
+
         // City Management
         Route::prefix('cities')->group(function () {
             Route::get('/', [CityController::class, 'index']);
@@ -353,6 +358,7 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 // Store registration specific routes
 Route::get('/store/terms', [App\Http\Controllers\StoreRegistrationController::class, 'getTermsAndConditions']);
 Route::get('/store/required-documents', [App\Http\Controllers\StoreRegistrationController::class, 'getRequiredDocuments']);
+Route::post('/store/{userId}/documents', [App\Http\Controllers\DocumentController::class, 'upload']);
 
 Route::get('/php-config', function () {
     return response()->json([
