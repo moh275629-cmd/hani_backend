@@ -68,7 +68,7 @@ class DocumentController extends Controller
             ]);
             
             return response()->json([
-                'message' => 'Server Error',
+                'message' => 'Server Error.' . $e->getMessage(),
                 'error' => config('app.debug') ? $e->getMessage() : 'Internal server error',
             ], 500);
         }
@@ -100,7 +100,7 @@ class DocumentController extends Controller
             Log::error('List documents error: ' . $e->getMessage());
             
             return response()->json([
-                'message' => 'Server Error',
+                'message' => 'Server Error.' . $e->getMessage(),
                 'error' => config('app.debug') ? $e->getMessage() : 'Internal server error',
             ], 500);
         }
@@ -114,7 +114,7 @@ class DocumentController extends Controller
                 'phone' => 'required_without:email|string|nullable',
                 'password' => 'required|string',
                 'documents' => 'required|array',
-                'documents.*' => 'file|mimes:pdf|max:20480', // Changed to accept only PDF
+                'documents.*' => 'file|mimes:pdf|max:20480',
                 'names' => 'array|nullable',
                 'names.*' => 'string|nullable',
                 'descriptions' => 'array|nullable',
@@ -221,7 +221,7 @@ class DocumentController extends Controller
             ]);
     
             return response()->json([
-                'message' => 'Server Error',
+                'message' => 'Server Error.' . $e->getMessage(),
                 'error' => config('app.debug') ? $e->getMessage() : 'Internal server error',
             ], 500);
         }
