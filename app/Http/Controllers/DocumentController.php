@@ -198,10 +198,24 @@ class DocumentController extends Controller
                     ], 400);
                 }
                 $mime = $f->getClientMimeType();
+                $extension = strtolower($f->getClientOriginalExtension());
                 $sizeKb = (int) ceil($f->getSize() / 1024);
-                if (!in_array($mime, ['image/jpeg','image/jpg', 'image/png', 'application/pdf'])) {
+                
+                // Log for debugging
+                Log::info('File validation', [
+                    'filename' => $f->getClientOriginalName(),
+                    'mime_type' => $mime,
+                    'extension' => $extension,
+                    'size_kb' => $sizeKb
+                ]);
+                
+                // Check both MIME type and file extension for more flexibility
+                $allowedMimes = ['image/jpeg', 'image/png', 'application/pdf'];
+                $allowedExtensions = ['jpg', 'jpeg', 'png', 'pdf'];
+                
+                if (!in_array($mime, $allowedMimes) && !in_array($extension, $allowedExtensions)) {
                     return response()->json([
-                        'message' => 'Unsupported file type',
+                        'message' => 'Unsupported file type. Detected MIME: ' . $mime . ', Extension: ' . $extension,
                     ], 415);
                 }
                 if ($sizeKb > 20480) {
