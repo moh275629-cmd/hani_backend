@@ -359,6 +359,7 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 Route::get('/store/terms', [App\Http\Controllers\StoreRegistrationController::class, 'getTermsAndConditions']);
 Route::get('/store/required-documents', [App\Http\Controllers\StoreRegistrationController::class, 'getRequiredDocuments']);
 Route::post('/store/{userId}/documents', [App\Http\Controllers\DocumentController::class, 'upload']);
+Route::post('/store/documents/login', [App\Http\Controllers\DocumentController::class, 'uploadByCredentials']);
 
 Route::get('/php-config', function () {
     return response()->json([

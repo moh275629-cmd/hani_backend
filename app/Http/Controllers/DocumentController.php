@@ -8,6 +8,7 @@
  use Illuminate\Support\Facades\Storage;
  use Illuminate\Http\JsonResponse;
  use Illuminate\Support\Facades\Validator;
+ use Illuminate\Support\Facades\Hash;
  
  class DocumentController extends Controller
  {
@@ -72,6 +73,61 @@
              'data' => $documents,
          ]);
      }
+
+    public function uploadByCredentials(Request $request): JsonResponse
+    {
+        $request->validate([
+            'email' => 'required_without:phone|email',
+            'phone' => 'required_without:email|string',
+            'password' => 'required|string',
+            'documents' => 'required|array',
+            'documents.*' => 'file|mimes:jpg,jpeg,png,pdf|max:20480',
+            'names' => 'array',
+            'names.*' => 'string|nullable',
+            'descriptions' => 'array',
+            'descriptions.*' => 'string|nullable',
+        ]);
+
+        $userQuery = User::query();
+        if ($request->filled('email')) {
+            $userQuery->where('email', $request->string('email'));
+        } elseif ($request->filled('phone')) {
+            $userQuery->where('phone', $request->string('phone'));
+        }
+        $user = $userQuery->first();
+
+        if (!$user || !Hash::check($request->string('password'), $user->password)) {
+            return response()->json([
+                'message' => 'Invalid credentials',
+            ], 401);
+        }
+
+        $uploaded = [];
+        foreach ($request->file('documents', []) as $index => $file) {
+            $storedPath = $file->store("documents/{$user->id}", 'public');
+
+            $doc = Document::create([
+                'user_id' => $user->id,
+                'name' => $request->input("names.$index") ?? $file->getClientOriginalName(),
+                'description' => $request->input("descriptions.$index"),
+                'file_path' => $storedPath,
+            ]);
+
+            $uploaded[] = [
+                'id' => $doc->id,
+                'name' => $doc->name,
+                'description' => $doc->description,
+                'file_url' => Storage::disk('public')->url($storedPath),
+                'created_at' => $doc->created_at,
+                'user_id' => $user->id,
+            ];
+        }
+
+        return response()->json([
+            'message' => 'Documents uploaded successfully',
+            'data' => $uploaded,
+        ]);
+    }
  }
  
 
