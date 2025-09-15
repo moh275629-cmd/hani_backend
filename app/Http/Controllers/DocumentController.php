@@ -199,7 +199,7 @@ class DocumentController extends Controller
                 }
                 $mime = $f->getClientMimeType();
                 $sizeKb = (int) ceil($f->getSize() / 1024);
-                if (!in_array($mime, ['image/jpeg', 'image/png', 'application/pdf'])) {
+                if (!in_array($mime, ['image/jpeg','image/jpg', 'image/png', 'application/pdf'])) {
                     return response()->json([
                         'message' => 'Unsupported file type',
                     ], 415);
