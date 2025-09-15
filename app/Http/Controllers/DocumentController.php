@@ -81,12 +81,14 @@
                 'email' => 'required_without:phone|email',
                 'phone' => 'required_without:email|string',
                 'password' => 'required|string',
-                'documents' => 'required',
+                'documents' => 'required|array',
+                'documents.*' => 'file|mimes:jpg,jpeg,png,pdf|max:20480',
                 'names' => 'array',
                 'names.*' => 'string|nullable',
                 'descriptions' => 'array',
                 'descriptions.*' => 'string|nullable',
             ]);
+            
 
             if ($validator->fails()) {
                 return response()->json([
