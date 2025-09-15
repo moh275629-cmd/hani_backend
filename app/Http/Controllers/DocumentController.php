@@ -107,115 +107,151 @@ class DocumentController extends Controller
     }
 
     public function uploadByCredentials(Request $request): JsonResponse
-{
-    try {
-        $validator = Validator::make($request->all(), [
-            'email' => 'required_without:phone|email|nullable',
-            'phone' => 'required_without:email|string|nullable',
-            'password' => 'required|string',
-            'documents' => 'required|array',
-            'documents.*' => 'file|mimes:jpg,jpeg,png,pdf|max:20480',
-            'names' => 'array|nullable',
-            'names.*' => 'string|nullable',
-            'descriptions' => 'array|nullable',
-            'descriptions.*' => 'string|nullable',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'message' => 'Validation error',
-                'errors' => $validator->errors(),
-            ], 422);
-        }
-
-        // Check that at least one of email or phone is provided
-        if (empty($request->email) && empty($request->phone)) {
-            return response()->json([
-                'message' => 'Validation error',
-                'errors' => ['Either email or phone must be provided'],
-            ], 422);
-        }
-
-        // Get all users and manually check encrypted fields
-        $users = User::all();
-        $user = null;
-
-        foreach ($users as $potentialUser) {
-            // Check if email matches (if provided)
-            if (!empty($request->email) && 
-                Hash::check($request->email, $potentialUser->email)) {
-                $user = $potentialUser;
-                break;
-            }
-            
-            // Check if phone matches (if provided and email didn't match)
-            if ($user === null && !empty($request->phone) && 
-                Hash::check($request->phone, $potentialUser->phone)) {
-                $user = $potentialUser;
-                break;
-            }
-        }
-
-        if (!$user) {
-            return response()->json([
-                'message' => 'User not found with the provided credentials',
-            ], 404);
-        }
-
-        if (!Hash::check($request->password, $user->password)) {
-            return response()->json([
-                'message' => 'Invalid password',
-            ], 401);
-        }
-
-        // Handle documents upload
-        $uploaded = [];
-        $documents = $request->file('documents');
-
-        foreach ($documents as $index => $file) {
-            if (!$file->isValid()) {
-                throw new \Exception('Invalid file uploaded');
-            }
-
-            $storedPath = $file->store("documents/{$user->id}", 'public');
-
-            $doc = Document::create([
-                'user_id' => $user->id,
-                'name' => $request->input("names.$index") ?? $file->getClientOriginalName(),
-                'description' => $request->input("descriptions.$index", ''),
-                'file_path' => $storedPath,
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'email' => 'required_without:phone|email|nullable',
+                'phone' => 'required_without:email|string|nullable',
+                'password' => 'required|string',
+                'names' => 'array|nullable',
+                'names.*' => 'string|nullable',
+                'descriptions' => 'array|nullable',
+                'descriptions.*' => 'string|nullable',
             ]);
 
-            $uploaded[] = [
-                'id' => $doc->id,
-                'name' => $doc->name,
-                'description' => $doc->description,
-                'file_url' => Storage::disk('public')->url($storedPath),
-                'created_at' => $doc->created_at,
-                'user_id' => $user->id,
-            ];
+            if ($validator->fails()) {
+                return response()->json([
+                    'message' => 'Validation error',
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
+
+            if (empty($request->email) && empty($request->phone)) {
+                return response()->json([
+                    'message' => 'Validation error',
+                    'errors' => ['Either email or phone must be provided'],
+                ], 422);
+            }
+
+            // Because email/phone are encrypted at rest, fetch candidates then match on decrypted getters
+            $candidateUsers = User::query()
+                ->select(['id', 'email', 'phone', 'password'])
+                ->get();
+
+            $user = null;
+            if (!empty($request->email)) {
+                $needle = strtolower(trim($request->email));
+                $user = $candidateUsers->first(function ($u) use ($needle) {
+                    return strtolower(trim((string) $u->email)) === $needle;
+                });
+            } elseif (!empty($request->phone)) {
+                $needle = preg_replace('/\s+/', '', (string) $request->phone);
+                $user = $candidateUsers->first(function ($u) use ($needle) {
+                    $phone = preg_replace('/\s+/', '', (string) $u->phone);
+                    return $phone === $needle;
+                });
+            }
+
+            if (!$user) {
+                return response()->json([
+                    'message' => 'User not found with the provided credentials',
+                ], 404);
+            }
+
+            if (!Hash::check($request->password, $user->password)) {
+                return response()->json([
+                    'message' => 'Invalid password',
+                ], 401);
+            }
+
+            // Collect files
+            $normalizedFiles = [];
+            if ($request->hasFile('documents')) {
+                $files = $request->file('documents');
+                if (is_array($files)) {
+                    $normalizedFiles = $files;
+                } elseif ($files !== null) {
+                    $normalizedFiles = [$files];
+                }
+            } else {
+                foreach ($request->allFiles() as $key => $value) {
+                    if (str_starts_with($key, 'documents')) {
+                        if (is_array($value)) {
+                            foreach ($value as $f) { $normalizedFiles[] = $f; }
+                        } else {
+                            $normalizedFiles[] = $value;
+                        }
+                    }
+                }
+            }
+
+            if (empty($normalizedFiles)) {
+                return response()->json([
+                    'message' => 'No documents found in request',
+                ], 400);
+            }
+
+            foreach ($normalizedFiles as $f) {
+                if (!$f->isValid()) {
+                    return response()->json([
+                        'message' => 'One or more files are invalid',
+                    ], 400);
+                }
+                $mime = $f->getClientMimeType();
+                $sizeKb = (int) ceil($f->getSize() / 1024);
+                if (!in_array($mime, ['image/jpeg', 'image/png', 'application/pdf'])) {
+                    return response()->json([
+                        'message' => 'Unsupported file type',
+                    ], 415);
+                }
+                if ($sizeKb > 20480) {
+                    return response()->json([
+                        'message' => 'File too large (max 20MB)',
+                    ], 413);
+                }
+            }
+
+            $uploaded = [];
+            foreach ($normalizedFiles as $index => $file) {
+                $storedPath = $file->store("documents/{$user->id}", 'public');
+
+                $doc = Document::create([
+                    'user_id' => $user->id,
+                    'name' => $request->input("names.$index") ?? $file->getClientOriginalName(),
+                    'description' => $request->input("descriptions.$index", ''),
+                    'file_path' => $storedPath,
+                ]);
+
+                $uploaded[] = [
+                    'id' => $doc->id,
+                    'name' => $doc->name,
+                    'description' => $doc->description,
+                    'file_url' => Storage::disk('public')->url($storedPath),
+                    'created_at' => $doc->created_at,
+                    'user_id' => $user->id,
+                ];
+            }
+
+            return response()->json([
+                'message' => 'Documents uploaded successfully',
+                'data' => $uploaded,
+            ]);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'message' => 'Validation error',
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (\Exception $e) {
+            Log::error('Upload by credentials error: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+                'request' => $request->except(['password', 'documents'])
+            ]);
+
+            return response()->json([
+                'message' => 'Server Error',
+                'error' => config('app.debug') ? $e->getMessage() : 'Internal server error',
+            ], 500);
         }
-
-        return response()->json([
-            'message' => 'Documents uploaded successfully',
-            'data' => $uploaded,
-        ]);
-
-    } catch (\Illuminate\Validation\ValidationException $e) {
-        return response()->json([
-            'message' => 'Validation error',
-            'errors' => $e->errors(),
-        ], 422);
-    } catch (\Exception $e) {
-        Log::error('Upload by credentials error: ' . $e->getMessage(), [
-            'trace' => $e->getTraceAsString(),
-            'request' => $request->except(['password', 'documents'])
-        ]);
-
-        return response()->json([
-            'message' => 'Server Error',
-            'error' => config('app.debug') ? $e->getMessage() : 'Internal server error',
-        ], 500);
     }
-}
 }
