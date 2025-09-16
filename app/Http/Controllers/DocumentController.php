@@ -11,6 +11,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
 
 class DocumentController extends Controller
 {
@@ -408,6 +409,39 @@ class DocumentController extends Controller
             ]);
         } catch (\Exception $e) {
             Log::error('Delete document by credentials error: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return response()->json([
+                'message' => 'Server Error.' . $e->getMessage(),
+                'error' => config('app.debug') ? $e->getMessage() : 'Internal server error',
+            ], 500);
+        }
+    }
+
+    public function deleteByUser(Request $request, int $userId, int $documentId): JsonResponse
+    {
+        try {
+            $authUser = Auth::user();
+            if (!$authUser || (int)$authUser->id !== (int)$userId) {
+                return response()->json(['message' => 'Unauthorized'], 401);
+            }
+
+            $doc = Document::where('id', $documentId)
+                ->where('user_id', $userId)
+                ->first();
+
+            if (!$doc) {
+                return response()->json(['message' => 'Document not found'], 404);
+            }
+
+            $doc->delete();
+
+            return response()->json([
+                'message' => 'Document deleted successfully',
+                'deleted' => true,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Delete document by user error: ' . $e->getMessage(), [
                 'trace' => $e->getTraceAsString(),
             ]);
             return response()->json([

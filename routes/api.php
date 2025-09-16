@@ -226,6 +226,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/rate/offer/{id}', [OfferRatingController::class, 'rateOffer']);
     Route::get('/ratings/offer/{id}', [OfferRatingController::class, 'getOfferRatings']);
     Route::get('/ratings/offer/{id}/user', [OfferRatingController::class, 'getUserOfferRating']);
+
+    // Documents (authenticated user)
+    Route::get('/documents/user/{userId}', [DocumentController::class, 'listByUser']);
+    Route::delete('/documents/user/{userId}/{documentId}', [DocumentController::class, 'deleteByUser']);
     
     // Image upload routes
     Route::post('/images/store/{storeId}/logo', [ImageController::class, 'uploadStoreLogo']);
