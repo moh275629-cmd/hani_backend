@@ -11,27 +11,16 @@ class CloudinarySignatureController extends Controller
     public function sign(Request $request): JsonResponse
     {
         $timestamp = $request->input('timestamp') ?: time();
-        $folder = $request->input('folder', 'hani');
+        $folder = $request->input('folder', 'hani/documents');
         $publicId = $request->input('public_id');
         $resourceType = $request->input('resource_type', 'auto');
         $type = $request->input('type', 'upload');
 
-        // Build parameters to sign - Cloudinary expects specific format
+        // Build parameters to sign - ONLY include what Cloudinary expects
         $paramsToSign = [
             'folder' => $folder,
             'timestamp' => (int) $timestamp,
         ];
-        
-        // Add optional parameters if provided
-        if (!empty($publicId)) {
-            $paramsToSign['public_id'] = $publicId;
-        }
-        if (!empty($type) && $type !== 'upload') {
-            $paramsToSign['type'] = $type;
-        }
-        if (!empty($resourceType) && $resourceType !== 'image') {
-            $paramsToSign['resource_type'] = $resourceType;
-        }
 
         // Sort by key and build key=value pairs
         ksort($paramsToSign);
@@ -47,15 +36,15 @@ class CloudinarySignatureController extends Controller
             return response()->json(['message' => 'Cloudinary secret not configured'], 500);
         }
 
-        // Use hash_hmac for more secure signing (Cloudinary supports both sha1 and sha256)
         $signature = hash_hmac('sha1', $stringToSign, $apiSecret);
-        // Alternatively, you can use sha256 for better security:
-        // $signature = hash_hmac('sha256', $stringToSign, $apiSecret);
 
-        Log::debug('Cloudinary signature generated', [
+        // DEBUG: Log everything for troubleshooting
+        Log::debug('Cloudinary Signature Debug', [
             'string_to_sign' => $stringToSign,
-            'signature' => $signature,
-            'timestamp' => $timestamp
+            'api_secret' => $apiSecret,
+            'generated_signature' => $signature,
+            'params_to_sign' => $paramsToSign,
+            'request_params' => $request->all()
         ]);
 
         return response()->json([
