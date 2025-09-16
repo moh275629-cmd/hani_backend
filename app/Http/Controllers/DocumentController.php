@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Document;
 use App\Models\User;
 use App\Services\CloudinaryService;
+use App\Services\SimpleCloudinaryService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Http\JsonResponse;
@@ -15,10 +16,12 @@ use Illuminate\Support\Facades\Log;
 class DocumentController extends Controller
 {
     protected $cloudinaryService;
+    protected $simpleCloudinaryService;
 
-    public function __construct(CloudinaryService $cloudinaryService)
+    public function __construct(CloudinaryService $cloudinaryService, SimpleCloudinaryService $simpleCloudinaryService)
     {
         $this->cloudinaryService = $cloudinaryService;
+        $this->simpleCloudinaryService = $simpleCloudinaryService;
     }
 
     public function upload(Request $request, $userId): JsonResponse
@@ -44,11 +47,23 @@ class DocumentController extends Controller
             $uploaded = [];
 
             foreach ($request->file('documents', []) as $index => $file) {
-                // Upload to Cloudinary
+                // Try main Cloudinary service first
                 $cloudinaryResult = $this->cloudinaryService->uploadDocument(
                     $file, 
                     "hani/documents/{$user->id}"
                 );
+
+                // If main service fails, try simple service as fallback
+                if (!$cloudinaryResult['success']) {
+                    Log::warning('Main Cloudinary service failed, trying simple service', [
+                        'error' => $cloudinaryResult['error']
+                    ]);
+                    
+                    $cloudinaryResult = $this->simpleCloudinaryService->uploadDocument(
+                        $file, 
+                        "hani/documents/{$user->id}"
+                    );
+                }
 
                 if (!$cloudinaryResult['success']) {
                     throw new \Exception('Cloudinary upload failed: ' . $cloudinaryResult['error']);
@@ -187,11 +202,23 @@ class DocumentController extends Controller
                 throw new \Exception('Invalid file uploaded: ' . $file->getErrorMessage());
             }
 
-            // Upload to Cloudinary
+            // Try main Cloudinary service first
             $cloudinaryResult = $this->cloudinaryService->uploadDocument(
                 $file, 
                 "hani/documents/{$user->id}"
             );
+
+            // If main service fails, try simple service as fallback
+            if (!$cloudinaryResult['success']) {
+                Log::warning('Main Cloudinary service failed in uploadByCredentials, trying simple service', [
+                    'error' => $cloudinaryResult['error']
+                ]);
+                
+                $cloudinaryResult = $this->simpleCloudinaryService->uploadDocument(
+                    $file, 
+                    "hani/documents/{$user->id}"
+                );
+            }
 
             if (!$cloudinaryResult['success']) {
                 throw new \Exception('Cloudinary upload failed: ' . $cloudinaryResult['error']);

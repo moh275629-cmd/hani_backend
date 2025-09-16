@@ -2,30 +2,16 @@
 
 namespace App\Services;
 
-use Cloudinary\Cloudinary;
-use Cloudinary\Configuration\Configuration;
+use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Log;
 
 class CloudinaryService
 {
-    protected $cloudinary;
-
     public function __construct()
     {
-        // Configure Cloudinary using the direct PHP package
-        Configuration::instance([
-            'cloud' => [
-                'cloud_name' => config('cloudinary.cloud_name'),
-                'api_key' => config('cloudinary.api_key'),
-                'api_secret' => config('cloudinary.api_secret'),
-            ],
-            'url' => [
-                'secure' => config('cloudinary.secure', true),
-            ],
-        ]);
-
-        $this->cloudinary = new Cloudinary();
+        // Cloudinary is configured via config/cloudinary.php
+        // and the Laravel package handles the configuration automatically
     }
 
     /**
@@ -40,9 +26,9 @@ class CloudinaryService
     {
         try {
             // Check if Cloudinary is properly configured
-            $cloudName = config('cloudinary.cloud_name');
-            $apiKey = config('cloudinary.api_key');
-            $apiSecret = config('cloudinary.api_secret');
+            $cloudName = config('cloudinary.cloud_name') ?? config('services.cloudinary.cloud_name');
+            $apiKey = config('cloudinary.api_key') ?? config('services.cloudinary.api_key');
+            $apiSecret = config('cloudinary.api_secret') ?? config('services.cloudinary.api_secret');
             
             if (empty($cloudName) || empty($apiKey) || empty($apiSecret)) {
                 throw new \Exception('Cloudinary configuration is missing. Please check your .env file.');
@@ -64,13 +50,8 @@ class CloudinaryService
                 'options' => $uploadOptions
             ]);
 
-            // Try using file content instead of file path
-            $fileContent = file_get_contents($file->getRealPath());
-            if ($fileContent === false) {
-                throw new \Exception('Could not read file content');
-            }
-            
-            $result = $this->cloudinary->uploadApi()->upload($fileContent, $uploadOptions);
+            // Try using the Laravel package's uploadFile method
+            $result = Cloudinary::uploadFile($file->getRealPath(), $uploadOptions);
 
             // Check if result is null or empty
             if (empty($result) || !is_array($result)) {

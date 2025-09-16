@@ -5,4 +5,7 @@ return [
     'api_key' => env('CLOUDINARY_API_KEY'),
     'api_secret' => env('CLOUDINARY_API_SECRET'),
     'secure' => env('CLOUDINARY_SECURE', true),
+    'url' => [
+        'secure' => env('CLOUDINARY_SECURE', true),
+    ],
 ];
