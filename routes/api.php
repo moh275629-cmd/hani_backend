@@ -19,6 +19,8 @@ use App\Http\Controllers\ActivationController;
 use App\Http\Controllers\WilayaController;
 use App\Http\Controllers\CityController;
 use App\Http\Controllers\RequiredDocumentsController;
+use App\Http\Controllers\StoreImageController;
+use App\Http\Controllers\OfferImageController;
 
 
 // Public routes
@@ -226,6 +228,16 @@ Route::middleware('auth:sanctum')->group(function () {
     // Image upload routes
     Route::post('/images/store/{storeId}/logo', [ImageController::class, 'uploadStoreLogo']);
     Route::post('/images/store/{storeId}/banner', [ImageController::class, 'uploadStoreBanner']);
+    
+    // Store image management routes
+    Route::post('/store/{storeId}/images', [StoreImageController::class, 'uploadImage']);
+    Route::get('/store/{storeId}/images', [StoreImageController::class, 'getImages']);
+    Route::delete('/store/{storeId}/images', [StoreImageController::class, 'deleteImage']);
+    
+    // Offer media management routes
+    Route::post('/offer/{offerId}/media', [OfferImageController::class, 'uploadMedia']);
+    Route::get('/offer/{offerId}/media', [OfferImageController::class, 'getMedia']);
+    Route::delete('/offer/{offerId}/media', [OfferImageController::class, 'deleteMedia']);
     Route::post('/images/store-logo/temp', [ImageController::class, 'uploadTempStoreLogo']); // For store owners
     Route::post('/images/store/{storeId}/logo/move-temp', [ImageController::class, 'moveTempStoreLogo']);
     Route::post('/images/offer/temp', [ImageController::class, 'uploadTempOfferImage']); // Moved here to fix route conflict

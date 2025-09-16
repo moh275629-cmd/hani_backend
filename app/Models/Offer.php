@@ -15,6 +15,8 @@ class Offer extends Model
         'description',
         'image',
         'image_blob',
+        'main_media_url',
+        'gallery_media',
         'valid_from',
         'valid_until',
         'discount_type',
@@ -54,6 +56,7 @@ class Offer extends Model
         'terms' => 'array',
         'applicable_products' => 'array',
         'excluded_products' => 'array',
+        'gallery_media' => 'array',
     ];
 
     // Relationships
@@ -184,6 +187,71 @@ class Offer extends Model
     public function hasImageBlob()
     {
         return !empty($this->image_blob);
+    }
+
+    // Cloudinary media methods
+    public function setMainMedia($cloudinaryUrl)
+    {
+        $this->main_media_url = $cloudinaryUrl;
+        $this->save();
+    }
+
+    public function addGalleryMedia($cloudinaryUrl, $mediaType = 'image')
+    {
+        $gallery = $this->gallery_media ?? [];
+        $gallery[] = [
+            'url' => $cloudinaryUrl,
+            'type' => $mediaType,
+            'created_at' => now()->toISOString(),
+        ];
+        $this->gallery_media = $gallery;
+        $this->save();
+    }
+
+    public function removeGalleryMedia($cloudinaryUrl)
+    {
+        $gallery = $this->gallery_media ?? [];
+        $gallery = array_filter($gallery, function($media) use ($cloudinaryUrl) {
+            return $media['url'] !== $cloudinaryUrl;
+        });
+        $this->gallery_media = array_values($gallery);
+        $this->save();
+    }
+
+    public function getMainMediaUrl()
+    {
+        return $this->main_media_url;
+    }
+
+    public function getGalleryMedia()
+    {
+        return $this->gallery_media ?? [];
+    }
+
+    public function hasMainMedia()
+    {
+        return !empty($this->main_media_url);
+    }
+
+    public function hasGalleryMedia()
+    {
+        return !empty($this->gallery_media) && count($this->gallery_media) > 0;
+    }
+
+    public function getImages()
+    {
+        $gallery = $this->getGalleryMedia();
+        return array_filter($gallery, function($media) {
+            return $media['type'] === 'image';
+        });
+    }
+
+    public function getVideos()
+    {
+        $gallery = $this->getGalleryMedia();
+        return array_filter($gallery, function($media) {
+            return $media['type'] === 'video';
+        });
     }
 
     public function getAverageRating()

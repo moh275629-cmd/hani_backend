@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Document;
 use App\Models\User;
+use App\Services\CloudinaryService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Http\JsonResponse;
@@ -13,6 +14,13 @@ use Illuminate\Support\Facades\Log;
 
 class DocumentController extends Controller
 {
+    protected $cloudinaryService;
+
+    public function __construct(CloudinaryService $cloudinaryService)
+    {
+        $this->cloudinaryService = $cloudinaryService;
+    }
+
     public function upload(Request $request, $userId): JsonResponse
     {
         try {
@@ -20,7 +28,7 @@ class DocumentController extends Controller
 
             $request->validate([
                 'documents' => 'required|array',
-                'documents.*' => 'file|mimes:jpg,jpeg,png,pdf|max:20480',
+                'documents.*' => 'file|mimes:pdf|max:20480',
                 'names' => 'array',
                 'names.*' => 'string|nullable',
                 'descriptions' => 'array',
@@ -30,20 +38,29 @@ class DocumentController extends Controller
             $uploaded = [];
 
             foreach ($request->file('documents', []) as $index => $file) {
-                $storedPath = $file->store("documents/{$user->id}", 'public');
+                // Upload to Cloudinary
+                $cloudinaryResult = $this->cloudinaryService->uploadDocument(
+                    $file, 
+                    "hani/documents/{$user->id}"
+                );
+
+                if (!$cloudinaryResult['success']) {
+                    throw new \Exception('Cloudinary upload failed: ' . $cloudinaryResult['error']);
+                }
 
                 $doc = Document::create([
                     'user_id' => $user->id,
                     'name' => $request->input("names.$index") ?? $file->getClientOriginalName(),
                     'description' => $request->input("descriptions.$index"),
-                    'file_path' => $storedPath,
+                    'file_path' => $cloudinaryResult['secure_url'], // Store Cloudinary URL
                 ]);
 
                 $uploaded[] = [
                     'id' => $doc->id,
                     'name' => $doc->name,
                     'description' => $doc->description,
-                    'file_url' => Storage::disk('public')->url($storedPath),
+                    'file_url' => $cloudinaryResult['secure_url'],
+                    'public_id' => $cloudinaryResult['public_id'],
                     'created_at' => $doc->created_at,
                 ];
             }
@@ -85,8 +102,8 @@ class DocumentController extends Controller
                         'id' => $doc->id,
                         'name' => $doc->name,
                         'description' => $doc->description,
-                        'file_path' => $doc->file_path,
-                        'file_url' => Storage::disk('public')->url($doc->file_path),
+                        'file_path' => $doc->file_path, // This is now the Cloudinary URL
+                        'file_url' => $doc->file_path, // Same as file_path since it's already a URL
                         'created_at' => $doc->created_at,
                     ];
                 });
@@ -160,13 +177,7 @@ class DocumentController extends Controller
             ], 401);
         }
 
-        // Check if storage is writable
-        $storagePath = storage_path('app/public/documents/' . $user->id);
-        if (!is_dir($storagePath) && !mkdir($storagePath, 0755, true)) {
-            throw new \Exception('Could not create storage directory');
-        }
-
-        // Handle documents upload
+        // Handle documents upload to Cloudinary
         $uploaded = [];
         $documents = $request->file('documents');
 
@@ -175,24 +186,29 @@ class DocumentController extends Controller
                 throw new \Exception('Invalid file uploaded: ' . $file->getErrorMessage());
             }
 
-            $storedPath = $file->store("documents/{$user->id}", 'public');
-            
-            if (!$storedPath) {
-                throw new \Exception('File storage failed for: ' . $file->getClientOriginalName());
+            // Upload to Cloudinary
+            $cloudinaryResult = $this->cloudinaryService->uploadDocument(
+                $file, 
+                "hani/documents/{$user->id}"
+            );
+
+            if (!$cloudinaryResult['success']) {
+                throw new \Exception('Cloudinary upload failed: ' . $cloudinaryResult['error']);
             }
 
             $doc = Document::create([
                 'user_id' => $user->id,
                 'name' => $request->input("names.$index") ?? $file->getClientOriginalName(),
                 'description' => $request->input("descriptions.$index", ''),
-                'file_path' => $storedPath,
+                'file_path' => $cloudinaryResult['secure_url'], // Store Cloudinary URL
             ]);
 
             $uploaded[] = [
                 'id' => $doc->id,
                 'name' => $doc->name,
                 'description' => $doc->description,
-                'file_url' => Storage::disk('public')->url($storedPath),
+                'file_url' => $cloudinaryResult['secure_url'],
+                'public_id' => $cloudinaryResult['public_id'],
                 'created_at' => $doc->created_at,
                 'user_id' => $user->id,
             ];

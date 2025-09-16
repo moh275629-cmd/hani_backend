@@ -24,6 +24,8 @@ class Store extends Model
         'logo_blob',
         'banner',
         'banner_blob',
+        'main_image_url',
+        'gallery_images',
         'address',
         'city',
         'state',
@@ -72,6 +74,7 @@ class Store extends Model
         'business_hours' => 'array',
         'payment_methods' => 'array',
         'services' => 'array',
+        'gallery_images' => 'array',
         // Keep coordinates as strings to avoid decimal cast with encrypted inputs
         'latitude' => 'string',
         'longitude' => 'string',
@@ -219,6 +222,51 @@ class Store extends Model
     public function hasBannerBlob()
     {
         return !empty($this->banner_blob);
+    }
+
+    // Cloudinary image methods
+    public function setMainImage($cloudinaryUrl)
+    {
+        $this->main_image_url = $cloudinaryUrl;
+        $this->save();
+    }
+
+    public function addGalleryImage($cloudinaryUrl)
+    {
+        $gallery = $this->gallery_images ?? [];
+        $gallery[] = $cloudinaryUrl;
+        $this->gallery_images = $gallery;
+        $this->save();
+    }
+
+    public function removeGalleryImage($cloudinaryUrl)
+    {
+        $gallery = $this->gallery_images ?? [];
+        $gallery = array_filter($gallery, function($url) use ($cloudinaryUrl) {
+            return $url !== $cloudinaryUrl;
+        });
+        $this->gallery_images = array_values($gallery);
+        $this->save();
+    }
+
+    public function getMainImageUrl()
+    {
+        return $this->main_image_url;
+    }
+
+    public function getGalleryImages()
+    {
+        return $this->gallery_images ?? [];
+    }
+
+    public function hasMainImage()
+    {
+        return !empty($this->main_image_url);
+    }
+
+    public function hasGalleryImages()
+    {
+        return !empty($this->gallery_images) && count($this->gallery_images) > 0;
     }
 
     /**
