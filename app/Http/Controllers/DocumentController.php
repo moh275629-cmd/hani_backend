@@ -4,8 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Document;
 use App\Models\User;
-use App\Services\CloudinaryService;
-use App\Services\SimpleCloudinaryService;
+// Removed Cloudinary services for URL-only flow
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Http\JsonResponse;
@@ -15,14 +14,6 @@ use Illuminate\Support\Facades\Log;
 
 class DocumentController extends Controller
 {
-    protected $cloudinaryService;
-    protected $simpleCloudinaryService;
-
-    public function __construct(CloudinaryService $cloudinaryService, SimpleCloudinaryService $simpleCloudinaryService)
-    {
-        $this->cloudinaryService = $cloudinaryService;
-        $this->simpleCloudinaryService = $simpleCloudinaryService;
-    }
 
     public function upload(Request $request, $userId): JsonResponse
     {
@@ -36,32 +27,39 @@ class DocumentController extends Controller
             $user = User::findOrFail($userId);
 
             $request->validate([
-                'documents' => 'array',
-                'documents.*' => 'file|mimes:pdf|max:20480',
-                'document_urls' => 'array',
-                'document_urls.*' => 'url',
+                'document_urls' => 'required|array|min:1',
+                'document_urls.*' => 'string|url',
                 'names' => 'array',
                 'names.*' => 'string|nullable',
                 'descriptions' => 'array',
                 'descriptions.*' => 'string|nullable',
             ]);
 
-            // Ensure at least one of files or urls is present
-            if (!$request->hasFile('documents') && empty($request->input('document_urls', []))) {
+            // Reject direct files; URLs only
+            if ($request->hasFile('documents')) {
                 return response()->json([
                     'message' => 'Validation error',
-                    'errors' => ['Either documents files or document_urls must be provided'],
+                    'errors' => ['Direct file uploads are not allowed. Provide Cloudinary PDF URLs only.'],
                 ], 422);
             }
 
             $uploaded = [];
 
-            // Accept direct Cloudinary URLs
+            // Accept direct Cloudinary PDF URLs only
             foreach ($request->input('document_urls', []) as $index => $docUrl) {
                 if (!is_string($docUrl) || stripos($docUrl, 'http') !== 0 || !preg_match('/\.pdf(\?|$)/i', $docUrl)) {
                     return response()->json([
                         'message' => 'Validation error',
                         'errors' => ["document_urls.$index must be a PDF url"],
+                    ], 422);
+                }
+
+                // Enforce Cloudinary host
+                $host = parse_url($docUrl, PHP_URL_HOST);
+                if (!is_string($host) || stripos($host, 'res.cloudinary.com') === false) {
+                    return response()->json([
+                        'message' => 'Validation error',
+                        'errors' => ["document_urls.$index must be a Cloudinary URL"],
                     ], 422);
                 }
 
@@ -82,46 +80,7 @@ class DocumentController extends Controller
                 ];
             }
 
-            // Legacy file flow (still supported)
-            foreach ($request->file('documents', []) as $index => $file) {
-                // Try main Cloudinary service first
-                $cloudinaryResult = $this->cloudinaryService->uploadDocument(
-                    $file, 
-                    "hani/documents/{$user->id}"
-                );
-
-                // If main service fails, try simple service as fallback
-                if (!$cloudinaryResult['success']) {
-                    Log::warning('Main Cloudinary service failed, trying simple service', [
-                        'error' => $cloudinaryResult['error']
-                    ]);
-                    
-                    $cloudinaryResult = $this->simpleCloudinaryService->uploadDocument(
-                        $file, 
-                        "hani/documents/{$user->id}"
-                    );
-                }
-
-                if (!$cloudinaryResult['success']) {
-                    throw new \Exception('Cloudinary upload failed: ' . $cloudinaryResult['error']);
-                }
-
-                $doc = Document::create([
-                    'user_id' => $user->id,
-                    'name' => $request->input("names.$index") ?? $file->getClientOriginalName(),
-                    'description' => $request->input("descriptions.$index"),
-                    'file_path' => $cloudinaryResult['secure_url'], // Store Cloudinary URL
-                ]);
-
-                $uploaded[] = [
-                    'id' => $doc->id,
-                    'name' => $doc->name,
-                    'description' => $doc->description,
-                    'file_url' => $cloudinaryResult['secure_url'],
-                    'public_id' => $cloudinaryResult['public_id'],
-                    'created_at' => $doc->created_at,
-                ];
-            }
+            // No legacy file flow — URLs only
 
             return response()->json([
                 'message' => 'Documents uploaded successfully',
@@ -188,11 +147,8 @@ class DocumentController extends Controller
             'email' => 'required_without:phone|email|nullable',
             'phone' => 'required_without:email|string|nullable',
             'password' => 'required|string',
-            'documents' => 'array',
-            'documents.*' => 'file|mimes:pdf|max:20480',
-            'document_urls' => 'array',
-            // Loosen URL rule to avoid false-negatives on signed URLs; validate manually below
-            'document_urls.*' => 'string',
+            'document_urls' => 'required|array|min:1',
+            'document_urls.*' => 'string|url',
             'names' => 'array|nullable',
             'names.*' => 'string|nullable',
             'descriptions' => 'array|nullable',
@@ -233,11 +189,11 @@ class DocumentController extends Controller
             ], 401);
         }
 
-        // Ensure at least one of files or urls is present
-        if (!$request->hasFile('documents') && empty($request->input('document_urls', []))) {
+        // Reject any direct files; URLs only
+        if ($request->hasFile('documents')) {
             return response()->json([
                 'message' => 'Validation error',
-                'errors' => ['Either documents files or document_urls must be provided'],
+                'errors' => ['Direct file uploads are not allowed. Provide Cloudinary PDF URLs only.'],
             ], 422);
         }
 
@@ -248,12 +204,20 @@ class DocumentController extends Controller
             'has_files' => $request->hasFile('documents')
         ]);
 
-        // Accept direct Cloudinary URLs first
+        // Accept direct Cloudinary PDF URLs only
         foreach ($request->input('document_urls', []) as $index => $docUrl) {
-            if (!is_string($docUrl) || stripos($docUrl, 'http') !== 0) {
+            if (!is_string($docUrl) || stripos($docUrl, 'http') !== 0 || !preg_match('/\.pdf(\?|$)/i', $docUrl)) {
                 return response()->json([
                     'message' => 'Validation error',
-                    'errors' => ["document_urls.$index must be a valid http(s) url"],
+                    'errors' => ["document_urls.$index must be a PDF url"],
+                ], 422);
+            }
+
+            $host = parse_url($docUrl, PHP_URL_HOST);
+            if (!is_string($host) || stripos($host, 'res.cloudinary.com') === false) {
+                return response()->json([
+                    'message' => 'Validation error',
+                    'errors' => ["document_urls.$index must be a Cloudinary URL"],
                 ], 422);
             }
 
@@ -287,51 +251,7 @@ class DocumentController extends Controller
             }
         }
 
-        // Legacy file flow (still supported)
-        foreach ($request->file('documents', []) as $index => $file) {
-            if (!$file->isValid()) {
-                throw new \Exception('Invalid file uploaded: ' . $file->getErrorMessage());
-            }
-
-            // Try main Cloudinary service first
-            $cloudinaryResult = $this->cloudinaryService->uploadDocument(
-                $file, 
-                "hani/documents/{$user->id}"
-            );
-
-            // If main service fails, try simple service as fallback
-            if (!$cloudinaryResult['success']) {
-                Log::warning('Main Cloudinary service failed in uploadByCredentials, trying simple service', [
-                    'error' => $cloudinaryResult['error']
-                ]);
-                
-                $cloudinaryResult = $this->simpleCloudinaryService->uploadDocument(
-                    $file, 
-                    "hani/documents/{$user->id}"
-                );
-            }
-
-            if (!$cloudinaryResult['success']) {
-                throw new \Exception('Cloudinary upload failed: ' . $cloudinaryResult['error']);
-            }
-
-            $doc = Document::create([
-                'user_id' => $user->id,
-                'name' => $request->input("names.$index") ?? $file->getClientOriginalName(),
-                'description' => $request->input("descriptions.$index", ''),
-                'file_path' => $cloudinaryResult['secure_url'], // Store Cloudinary URL
-            ]);
-
-            $uploaded[] = [
-                'id' => $doc->id,
-                'name' => $doc->name,
-                'description' => $doc->description,
-                'file_url' => $cloudinaryResult['secure_url'],
-                'public_id' => $cloudinaryResult['public_id'],
-                'created_at' => $doc->created_at,
-                'user_id' => $user->id,
-            ];
-        }
+        // No file upload flow — URLs only
 
         return response()->json([
             'message' => 'Documents uploaded successfully',
