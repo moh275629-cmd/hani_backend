@@ -2,6 +2,7 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\CloudinarySignatureController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\LoyaltyCardController;
 use App\Http\Controllers\OfferController;
@@ -556,4 +557,7 @@ Route::post('/test-cloudinary-upload', function (Request $request) {
         ], 500);
     }
 });
+
+// Cloudinary signature endpoint for client-side direct uploads
+Route::post('/cloudinary/signature', [CloudinarySignatureController::class, 'sign']);
 

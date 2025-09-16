@@ -36,16 +36,53 @@ class DocumentController extends Controller
             $user = User::findOrFail($userId);
 
             $request->validate([
-                'documents' => 'required|array',
+                'documents' => 'array',
                 'documents.*' => 'file|mimes:pdf|max:20480',
+                'document_urls' => 'array',
+                'document_urls.*' => 'url',
                 'names' => 'array',
                 'names.*' => 'string|nullable',
                 'descriptions' => 'array',
                 'descriptions.*' => 'string|nullable',
             ]);
 
+            // Ensure at least one of files or urls is present
+            if (!$request->hasFile('documents') && empty($request->input('document_urls', []))) {
+                return response()->json([
+                    'message' => 'Validation error',
+                    'errors' => ['Either documents files or document_urls must be provided'],
+                ], 422);
+            }
+
             $uploaded = [];
 
+            // Accept direct Cloudinary URLs
+            foreach ($request->input('document_urls', []) as $index => $docUrl) {
+                if (!is_string($docUrl) || stripos($docUrl, 'http') !== 0 || !preg_match('/\.pdf(\?|$)/i', $docUrl)) {
+                    return response()->json([
+                        'message' => 'Validation error',
+                        'errors' => ["document_urls.$index must be a PDF url"],
+                    ], 422);
+                }
+
+                $doc = Document::create([
+                    'user_id' => $user->id,
+                    'name' => $request->input("names.$index") ?? 'Document',
+                    'description' => $request->input("descriptions.$index"),
+                    'file_path' => $docUrl,
+                ]);
+
+                $uploaded[] = [
+                    'id' => $doc->id,
+                    'name' => $doc->name,
+                    'description' => $doc->description,
+                    'file_url' => $doc->file_path,
+                    'public_id' => null,
+                    'created_at' => $doc->created_at,
+                ];
+            }
+
+            // Legacy file flow (still supported)
             foreach ($request->file('documents', []) as $index => $file) {
                 // Try main Cloudinary service first
                 $cloudinaryResult = $this->cloudinaryService->uploadDocument(
@@ -151,8 +188,10 @@ class DocumentController extends Controller
             'email' => 'required_without:phone|email|nullable',
             'phone' => 'required_without:email|string|nullable',
             'password' => 'required|string',
-            'documents' => 'required|array',
+            'documents' => 'array',
             'documents.*' => 'file|mimes:pdf|max:20480',
+            'document_urls' => 'array',
+            'document_urls.*' => 'url',
             'names' => 'array|nullable',
             'names.*' => 'string|nullable',
             'descriptions' => 'array|nullable',
@@ -193,11 +232,45 @@ class DocumentController extends Controller
             ], 401);
         }
 
-        // Handle documents upload to Cloudinary
-        $uploaded = [];
-        $documents = $request->file('documents');
+        // Ensure at least one of files or urls is present
+        if (!$request->hasFile('documents') && empty($request->input('document_urls', []))) {
+            return response()->json([
+                'message' => 'Validation error',
+                'errors' => ['Either documents files or document_urls must be provided'],
+            ], 422);
+        }
 
-        foreach ($documents as $index => $file) {
+        $uploaded = [];
+
+        // Accept direct Cloudinary URLs first
+        foreach ($request->input('document_urls', []) as $index => $docUrl) {
+            if (!is_string($docUrl) || stripos($docUrl, 'http') !== 0 || !preg_match('/\.pdf(\?|$)/i', $docUrl)) {
+                return response()->json([
+                    'message' => 'Validation error',
+                    'errors' => ["document_urls.$index must be a PDF url"],
+                ], 422);
+            }
+
+            $doc = Document::create([
+                'user_id' => $user->id,
+                'name' => $request->input("names.$index") ?? 'Document',
+                'description' => $request->input("descriptions.$index", ''),
+                'file_path' => $docUrl,
+            ]);
+
+            $uploaded[] = [
+                'id' => $doc->id,
+                'name' => $doc->name,
+                'description' => $doc->description,
+                'file_url' => $doc->file_path,
+                'public_id' => null,
+                'created_at' => $doc->created_at,
+                'user_id' => $user->id,
+            ];
+        }
+
+        // Legacy file flow (still supported)
+        foreach ($request->file('documents', []) as $index => $file) {
             if (!$file->isValid()) {
                 throw new \Exception('Invalid file uploaded: ' . $file->getErrorMessage());
             }

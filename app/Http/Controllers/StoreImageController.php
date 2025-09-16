@@ -27,7 +27,9 @@ class StoreImageController extends Controller
             $store = Store::findOrFail($storeId);
 
             $validator = Validator::make($request->all(), [
-                'image' => 'required|file|mimes:jpg,jpeg,png|max:10240', // 10MB max
+                // Accept either image file or image_url (Cloudinary URL)
+                'image' => 'file|mimes:jpg,jpeg,png|max:10240',
+                'image_url' => 'url',
                 'is_main_image' => 'boolean',
             ]);
 
@@ -40,32 +42,43 @@ class StoreImageController extends Controller
 
             $isMainImage = $request->boolean('is_main_image', false);
 
-            // Upload to Cloudinary
-            $cloudinaryResult = $this->cloudinaryService->uploadStoreImage(
-                $request->file('image'),
-                $storeId,
-                $isMainImage
-            );
+            // If image_url provided, store it directly, else upload file
+            $finalUrl = null;
+            if ($request->filled('image_url')) {
+                $finalUrl = $request->input('image_url');
+            } elseif ($request->hasFile('image')) {
+                $cloudinaryResult = $this->cloudinaryService->uploadStoreImage(
+                    $request->file('image'),
+                    $storeId,
+                    $isMainImage
+                );
 
-            if (!$cloudinaryResult['success']) {
+                if (!$cloudinaryResult['success']) {
+                    return response()->json([
+                        'message' => 'Image upload failed',
+                        'error' => $cloudinaryResult['error'],
+                    ], 500);
+                }
+                $finalUrl = $cloudinaryResult['secure_url'] ?? $cloudinaryResult['url'];
+            } else {
                 return response()->json([
-                    'message' => 'Image upload failed',
-                    'error' => $cloudinaryResult['error'],
-                ], 500);
+                    'message' => 'Validation error',
+                    'errors' => ['Either image file or image_url must be provided'],
+                ], 422);
             }
 
             // Update store with image URL
             if ($isMainImage) {
-                $store->setMainImage($cloudinaryResult['secure_url']);
+                $store->setMainImage($finalUrl);
             } else {
-                $store->addGalleryImage($cloudinaryResult['secure_url']);
+                $store->addGalleryImage($finalUrl);
             }
 
             return response()->json([
                 'message' => 'Image uploaded successfully',
                 'data' => [
-                    'url' => $cloudinaryResult['secure_url'],
-                    'public_id' => $cloudinaryResult['public_id'],
+                    'url' => $finalUrl,
+                    'public_id' => null,
                     'is_main_image' => $isMainImage,
                 ],
             ]);

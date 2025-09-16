@@ -27,7 +27,9 @@ class OfferImageController extends Controller
             $offer = Offer::findOrFail($offerId);
 
             $validator = Validator::make($request->all(), [
-                'media' => 'required|file|mimes:jpg,jpeg,png,mp4,mov,avi|max:51200', // 50MB max for videos
+                // Accept either media file or media_url (Cloudinary URL)
+                'media' => 'file|mimes:jpg,jpeg,png,mp4,mov,avi|max:51200',
+                'media_url' => 'url',
                 'is_main_media' => 'boolean',
                 'media_type' => 'in:image,video',
             ]);
@@ -42,32 +44,43 @@ class OfferImageController extends Controller
             $isMainMedia = $request->boolean('is_main_media', false);
             $mediaType = $request->input('media_type', 'image');
 
-            // Upload to Cloudinary
-            $cloudinaryResult = $this->cloudinaryService->uploadOfferMedia(
-                $request->file('media'),
-                $offerId,
-                $isMainMedia
-            );
+            // If media_url provided, store it directly, else upload file
+            $finalUrl = null;
+            if ($request->filled('media_url')) {
+                $finalUrl = $request->input('media_url');
+            } elseif ($request->hasFile('media')) {
+                $cloudinaryResult = $this->cloudinaryService->uploadOfferMedia(
+                    $request->file('media'),
+                    $offerId,
+                    $isMainMedia
+                );
 
-            if (!$cloudinaryResult['success']) {
+                if (!$cloudinaryResult['success']) {
+                    return response()->json([
+                        'message' => 'Media upload failed',
+                        'error' => $cloudinaryResult['error'],
+                    ], 500);
+                }
+                $finalUrl = $cloudinaryResult['secure_url'] ?? $cloudinaryResult['url'];
+            } else {
                 return response()->json([
-                    'message' => 'Media upload failed',
-                    'error' => $cloudinaryResult['error'],
-                ], 500);
+                    'message' => 'Validation error',
+                    'errors' => ['Either media file or media_url must be provided'],
+                ], 422);
             }
 
             // Update offer with media URL
             if ($isMainMedia) {
-                $offer->setMainMedia($cloudinaryResult['secure_url']);
+                $offer->setMainMedia($finalUrl);
             } else {
-                $offer->addGalleryMedia($cloudinaryResult['secure_url'], $mediaType);
+                $offer->addGalleryMedia($finalUrl, $mediaType);
             }
 
             return response()->json([
                 'message' => 'Media uploaded successfully',
                 'data' => [
-                    'url' => $cloudinaryResult['secure_url'],
-                    'public_id' => $cloudinaryResult['public_id'],
+                    'url' => $finalUrl,
+                    'public_id' => null,
                     'is_main_media' => $isMainMedia,
                     'media_type' => $mediaType,
                 ],
