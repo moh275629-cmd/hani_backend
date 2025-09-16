@@ -22,6 +22,7 @@ use App\Http\Controllers\CityController;
 use App\Http\Controllers\RequiredDocumentsController;
 use App\Http\Controllers\StoreImageController;
 use App\Http\Controllers\OfferImageController;
+use App\Http\Controllers\DocumentController;
 
 
 // Public routes
@@ -373,6 +374,7 @@ Route::get('/store/terms', [App\Http\Controllers\StoreRegistrationController::cl
 Route::get('/store/required-documents', [App\Http\Controllers\StoreRegistrationController::class, 'getRequiredDocuments']);
 Route::post('/store/{userId}/documents', [App\Http\Controllers\DocumentController::class, 'upload']);
 Route::post('/store/documents/login', [App\Http\Controllers\DocumentController::class, 'uploadByCredentials']);
+Route::post('/store/documents/list-by-credentials', [DocumentController::class, 'listByCredentials']);
 
 Route::get('/php-config', function () {
     return response()->json([

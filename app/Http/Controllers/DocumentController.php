@@ -275,4 +275,75 @@ class DocumentController extends Controller
         ], 500);
     }
 }
+
+    public function listByCredentials(Request $request): JsonResponse
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'email' => 'required_without:phone|email|nullable',
+                'phone' => 'required_without:email|string|nullable',
+                'password' => 'required|string',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'message' => 'Validation error',
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
+
+            if (empty($request->email) && empty($request->phone)) {
+                return response()->json([
+                    'message' => 'Validation error',
+                    'errors' => ['Either email or phone must be provided'],
+                ], 422);
+            }
+
+            $user = User::all()->first(function ($u) use ($request) {
+                if (!empty($request->email)) {
+                    return strtolower(trim($u->email)) === strtolower(trim($request->email));
+                }
+                return false;
+            });
+
+            if (!$user) {
+                return response()->json([
+                    'message' => 'User not found with the provided email',
+                ], 404);
+            }
+
+            if (!Hash::check($request->password, $user->password)) {
+                return response()->json([
+                    'message' => 'Invalid password',
+                ], 401);
+            }
+
+            $documents = Document::where('user_id', $user->id)
+                ->latest()
+                ->get()
+                ->map(function ($doc) {
+                    return [
+                        'id' => $doc->id,
+                        'name' => $doc->name,
+                        'description' => $doc->description,
+                        'file_path' => $doc->file_path,
+                        'file_url' => $doc->file_path,
+                        'created_at' => $doc->created_at,
+                    ];
+                });
+
+            return response()->json([
+                'message' => 'Documents retrieved successfully',
+                'data' => $documents,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('List documents by credentials error: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return response()->json([
+                'message' => 'Server Error.' . $e->getMessage(),
+                'error' => config('app.debug') ? $e->getMessage() : 'Internal server error',
+            ], 500);
+        }
+    }
 }
