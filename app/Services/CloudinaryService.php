@@ -2,33 +2,16 @@
 
 namespace App\Services;
 
-use Cloudinary\Cloudinary;
-use Cloudinary\Configuration\Configuration;
-use Cloudinary\Api\Upload\UploadApi;
+use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Log;
 
 class CloudinaryService
 {
-    protected $cloudinary;
-    protected $uploadApi;
-
     public function __construct()
     {
-        // Configure Cloudinary
-        Configuration::instance([
-            'cloud' => [
-                'cloud_name' => config('services.cloudinary.cloud_name'),
-                'api_key' => config('services.cloudinary.api_key'),
-                'api_secret' => config('services.cloudinary.api_secret'),
-            ],
-            'url' => [
-                'secure' => config('services.cloudinary.secure', true),
-            ],
-        ]);
-
-        $this->cloudinary = new Cloudinary();
-        $this->uploadApi = new UploadApi();
+        // Cloudinary is configured via config/cloudinary.php
+        // and the Laravel package handles the configuration automatically
     }
 
     /**
@@ -51,10 +34,7 @@ class CloudinaryService
 
             $uploadOptions = array_merge($defaultOptions, $options);
 
-            $result = $this->uploadApi->upload(
-                $file->getRealPath(),
-                $uploadOptions
-            );
+            $result = Cloudinary::upload($file->getRealPath(), $uploadOptions);
 
             return [
                 'success' => true,

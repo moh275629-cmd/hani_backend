@@ -24,6 +24,12 @@ class DocumentController extends Controller
     public function upload(Request $request, $userId): JsonResponse
     {
         try {
+            Log::info('Document upload request received', [
+                'user_id' => $userId,
+                'files_count' => count($request->file('documents', [])),
+                'request_data' => $request->all()
+            ]);
+
             $user = User::findOrFail($userId);
 
             $request->validate([
