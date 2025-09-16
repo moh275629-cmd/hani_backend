@@ -375,6 +375,7 @@ Route::get('/store/required-documents', [App\Http\Controllers\StoreRegistrationC
 Route::post('/store/{userId}/documents', [App\Http\Controllers\DocumentController::class, 'upload']);
 Route::post('/store/documents/login', [App\Http\Controllers\DocumentController::class, 'uploadByCredentials']);
 Route::post('/store/documents/list-by-credentials', [DocumentController::class, 'listByCredentials']);
+Route::delete('/store/documents/delete-by-credentials', [DocumentController::class, 'deleteByCredentials']);
 
 Route::get('/php-config', function () {
     return response()->json([

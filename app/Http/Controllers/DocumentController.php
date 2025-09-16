@@ -346,4 +346,74 @@ class DocumentController extends Controller
             ], 500);
         }
     }
+
+    public function deleteByCredentials(Request $request): JsonResponse
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'email' => 'required_without:phone|email|nullable',
+                'phone' => 'required_without:email|string|nullable',
+                'password' => 'required|string',
+                'document_id' => 'required|integer',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'message' => 'Validation error',
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
+
+            if (empty($request->email) && empty($request->phone)) {
+                return response()->json([
+                    'message' => 'Validation error',
+                    'errors' => ['Either email or phone must be provided'],
+                ], 422);
+            }
+
+            $user = User::all()->first(function ($u) use ($request) {
+                if (!empty($request->email)) {
+                    return strtolower(trim($u->email)) === strtolower(trim($request->email));
+                }
+                return false;
+            });
+
+            if (!$user) {
+                return response()->json([
+                    'message' => 'User not found with the provided email',
+                ], 404);
+            }
+
+            if (!Hash::check($request->password, $user->password)) {
+                return response()->json([
+                    'message' => 'Invalid password',
+                ], 401);
+            }
+
+            $doc = Document::where('id', (int) $request->input('document_id'))
+                ->where('user_id', $user->id)
+                ->first();
+
+            if (!$doc) {
+                return response()->json([
+                    'message' => 'Document not found',
+                ], 404);
+            }
+
+            $doc->delete();
+
+            return response()->json([
+                'message' => 'Document deleted successfully',
+                'deleted' => true,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Delete document by credentials error: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return response()->json([
+                'message' => 'Server Error.' . $e->getMessage(),
+                'error' => config('app.debug') ? $e->getMessage() : 'Internal server error',
+            ], 500);
+        }
+    }
 }
