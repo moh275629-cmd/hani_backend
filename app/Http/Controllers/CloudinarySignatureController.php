@@ -36,15 +36,14 @@ class CloudinarySignatureController extends Controller
             return response()->json(['message' => 'Cloudinary secret not configured'], 500);
         }
 
-        $signature = hash_hmac('sha1', $stringToSign, $apiSecret);
+        // Per Cloudinary: signature = SHA1(string_to_sign + api_secret)
+        $signature = sha1($stringToSign . $apiSecret);
 
-        // DEBUG: Log everything for troubleshooting
+        // Debug (do not log secrets)
         Log::debug('Cloudinary Signature Debug', [
             'string_to_sign' => $stringToSign,
-            'api_secret' => $apiSecret,
             'generated_signature' => $signature,
             'params_to_sign' => $paramsToSign,
-            'request_params' => $request->all()
         ]);
 
         return response()->json([
