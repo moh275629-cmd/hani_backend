@@ -191,7 +191,8 @@ class DocumentController extends Controller
             'documents' => 'array',
             'documents.*' => 'file|mimes:pdf|max:20480',
             'document_urls' => 'array',
-            'document_urls.*' => 'url',
+            // Loosen URL rule to avoid false-negatives on signed URLs; validate manually below
+            'document_urls.*' => 'string',
             'names' => 'array|nullable',
             'names.*' => 'string|nullable',
             'descriptions' => 'array|nullable',
@@ -241,32 +242,49 @@ class DocumentController extends Controller
         }
 
         $uploaded = [];
+        Log::info('uploadByCredentials - payload received', [
+            'email' => $request->email,
+            'urls_count' => is_array($request->input('document_urls')) ? count($request->input('document_urls')) : 0,
+            'has_files' => $request->hasFile('documents')
+        ]);
 
         // Accept direct Cloudinary URLs first
         foreach ($request->input('document_urls', []) as $index => $docUrl) {
-            if (!is_string($docUrl) || stripos($docUrl, 'http') !== 0 || !preg_match('/\.pdf(\?|$)/i', $docUrl)) {
+            if (!is_string($docUrl) || stripos($docUrl, 'http') !== 0) {
                 return response()->json([
                     'message' => 'Validation error',
-                    'errors' => ["document_urls.$index must be a PDF url"],
+                    'errors' => ["document_urls.$index must be a valid http(s) url"],
                 ], 422);
             }
 
-            $doc = Document::create([
-                'user_id' => $user->id,
-                'name' => $request->input("names.$index") ?? 'Document',
-                'description' => $request->input("descriptions.$index", ''),
-                'file_path' => $docUrl,
-            ]);
+            try {
+                $doc = Document::create([
+                    'user_id' => $user->id,
+                    'name' => $request->input("names.$index") ?? 'Document',
+                    'description' => $request->input("descriptions.$index", ''),
+                    'file_path' => $docUrl,
+                ]);
 
-            $uploaded[] = [
-                'id' => $doc->id,
-                'name' => $doc->name,
-                'description' => $doc->description,
-                'file_url' => $doc->file_path,
-                'public_id' => null,
-                'created_at' => $doc->created_at,
-                'user_id' => $user->id,
-            ];
+                $uploaded[] = [
+                    'id' => $doc->id,
+                    'name' => $doc->name,
+                    'description' => $doc->description,
+                    'file_url' => $doc->file_path,
+                    'public_id' => null,
+                    'created_at' => $doc->created_at,
+                    'user_id' => $user->id,
+                ];
+            } catch (\Exception $ex) {
+                Log::error('Failed saving document URL', [
+                    'error' => $ex->getMessage(),
+                    'url' => $docUrl,
+                    'index' => $index,
+                ]);
+                return response()->json([
+                    'message' => 'Failed to save document',
+                    'error' => config('app.debug') ? $ex->getMessage() : 'Internal server error',
+                ], 500);
+            }
         }
 
         // Legacy file flow (still supported)
