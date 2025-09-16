@@ -158,24 +158,19 @@ class DocumentController extends Controller
             ], 422);
         }
 
-        // Find user with better query optimization
-        $query = User::query();
+        $user = User::all()->first(function ($u) use ($request) {
+            if (!empty($request->email)) {
+                return strtolower(trim($u->email)) === strtolower(trim($request->email));
+            }
+            return false;
+        });
         
-        if (!empty($request->email)) {
-            $email = strtolower(trim($request->email));
-            $query->whereRaw('LOWER(TRIM(email)) = ?', [$email]);
-        } elseif (!empty($request->phone)) {
-            $phone = preg_replace('/\s+/', '', (string) $request->phone);
-            $query->whereRaw("REPLACE(phone, ' ', '') = ?", [$phone]);
-        }
-
-        $user = $query->first();
-
         if (!$user) {
             return response()->json([
-                'message' => 'User not found with the provided credentials',
+                'message' => 'User not found with the provided email',
             ], 404);
         }
+        
 
         if (!Hash::check($request->password, $user->password)) {
             return response()->json([
