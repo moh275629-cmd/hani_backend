@@ -281,8 +281,8 @@ class DocumentController extends Controller
                     'index' => $index,
                 ]);
                 return response()->json([
-                    'message' => 'Failed to save document',
-                    'error' => config('app.debug') ? $ex->getMessage() : 'Internal server error',
+                    'message' => 'Failed to save document.' . $ex->getMessage(),
+                    'error' => $ex->getMessage() . 'Internal server error',
                 ], 500);
             }
         }
