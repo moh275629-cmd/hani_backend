@@ -2,16 +2,30 @@
 
 namespace App\Services;
 
-use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
+use Cloudinary\Cloudinary;
+use Cloudinary\Configuration\Configuration;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Log;
 
 class CloudinaryService
 {
+    protected $cloudinary;
+
     public function __construct()
     {
-        // Cloudinary is configured via config/cloudinary.php
-        // and the Laravel package handles the configuration automatically
+        // Configure Cloudinary using the direct PHP package
+        Configuration::instance([
+            'cloud' => [
+                'cloud_name' => config('cloudinary.cloud_name'),
+                'api_key' => config('cloudinary.api_key'),
+                'api_secret' => config('cloudinary.api_secret'),
+            ],
+            'url' => [
+                'secure' => config('cloudinary.secure', true),
+            ],
+        ]);
+
+        $this->cloudinary = new Cloudinary();
     }
 
     /**
@@ -25,6 +39,15 @@ class CloudinaryService
     public function uploadFile(UploadedFile $file, string $folder = 'hani', array $options = []): array
     {
         try {
+            // Check if Cloudinary is properly configured
+            $cloudName = config('cloudinary.cloud_name');
+            $apiKey = config('cloudinary.api_key');
+            $apiSecret = config('cloudinary.api_secret');
+            
+            if (empty($cloudName) || empty($apiKey) || empty($apiSecret)) {
+                throw new \Exception('Cloudinary configuration is missing. Please check your .env file.');
+            }
+
             $defaultOptions = [
                 'folder' => $folder,
                 'resource_type' => 'auto', // Automatically detect image, video, or raw
@@ -34,21 +57,50 @@ class CloudinaryService
 
             $uploadOptions = array_merge($defaultOptions, $options);
 
-            $result = Cloudinary::upload($file->getRealPath(), $uploadOptions);
+            Log::info('Uploading to Cloudinary', [
+                'file_path' => $file->getRealPath(),
+                'file_size' => $file->getSize(),
+                'file_mime' => $file->getMimeType(),
+                'options' => $uploadOptions
+            ]);
+
+            // Try using file content instead of file path
+            $fileContent = file_get_contents($file->getRealPath());
+            if ($fileContent === false) {
+                throw new \Exception('Could not read file content');
+            }
+            
+            $result = $this->cloudinary->uploadApi()->upload($fileContent, $uploadOptions);
+
+            // Check if result is null or empty
+            if (empty($result) || !is_array($result)) {
+                Log::error('Cloudinary upload returned null or invalid result', [
+                    'result' => $result,
+                    'result_type' => gettype($result)
+                ]);
+                throw new \Exception('Cloudinary upload returned null or invalid result');
+            }
+
+            Log::info('Cloudinary upload successful', ['result' => $result]);
 
             return [
                 'success' => true,
-                'public_id' => $result['public_id'],
-                'secure_url' => $result['secure_url'],
-                'url' => $result['url'],
-                'format' => $result['format'],
-                'resource_type' => $result['resource_type'],
-                'bytes' => $result['bytes'],
+                'public_id' => $result['public_id'] ?? null,
+                'secure_url' => $result['secure_url'] ?? null,
+                'url' => $result['url'] ?? null,
+                'format' => $result['format'] ?? null,
+                'resource_type' => $result['resource_type'] ?? null,
+                'bytes' => $result['bytes'] ?? null,
                 'width' => $result['width'] ?? null,
                 'height' => $result['height'] ?? null,
             ];
         } catch (\Exception $e) {
-            Log::error('Cloudinary upload failed: ' . $e->getMessage());
+            Log::error('Cloudinary upload failed: ' . $e->getMessage(), [
+                'file_path' => $file->getRealPath(),
+                'file_size' => $file->getSize(),
+                'file_mime' => $file->getMimeType(),
+                'trace' => $e->getTraceAsString()
+            ]);
             return [
                 'success' => false,
                 'error' => $e->getMessage(),

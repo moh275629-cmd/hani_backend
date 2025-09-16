@@ -513,3 +513,4 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/required-documents/category/{category}', [RequiredDocumentsController::class, 'getForCategory']);
     Route::get('/required-documents/required/{category}', [RequiredDocumentsController::class, 'getRequiredForCategory']);
 });
+
