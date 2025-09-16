@@ -351,7 +351,7 @@ class DocumentController extends Controller
 
         return response()->json([
             'message' => 'Upload failed: ' . $e->getMessage(),
-            'error' => config('app.debug') ? $e->getMessage() : 'Internal server error',
+            'error' => 'Internal server error' . $e->getMessage(),
         ], 500);
     }
 }
