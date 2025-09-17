@@ -3,99 +3,166 @@
 namespace App\Http\Controllers;
 
 use App\Models\Store;
-use App\Services\CloudinaryService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
 
 class StoreImageController extends Controller
 {
-    protected $cloudinaryService;
-
-    public function __construct(CloudinaryService $cloudinaryService)
+    /**
+     * Upload multiple store images
+     */
+    public function uploadBatch(Request $request, $storeId): JsonResponse
     {
-        $this->cloudinaryService = $cloudinaryService;
+        try {
+            $request->validate([
+                'image_urls' => 'required|array|min:1|max:10',
+                'image_urls.*' => 'required|url',
+                'main_image_url' => 'nullable|url',
+            ]);
+
+            $store = Store::findOrFail($storeId);
+            
+            // Check if user owns this store
+            if ($store->user_id !== Auth::id()) {
+                return response()->json([
+                    'message' => 'Unauthorized. You can only manage your own store images.',
+                ], 403);
+            }
+
+            $imageUrls = $request->input('image_urls');
+            $mainImageUrl = $request->input('main_image_url');
+
+            // Validate that main image is in the list
+            if ($mainImageUrl && !in_array($mainImageUrl, $imageUrls)) {
+                return response()->json([
+                    'message' => 'Main image URL must be one of the uploaded image URLs.',
+                ], 422);
+            }
+
+            // Get existing gallery images
+            $existingGallery = $store->gallery_images ?? [];
+            
+            // Add new images to gallery
+            foreach ($imageUrls as $imageUrl) {
+                $existingGallery[] = [
+                    'url' => $imageUrl,
+                    'type' => 'image',
+                    'created_at' => now()->toISOString(),
+                ];
+            }
+
+            // Update store with new gallery and main image
+            $store->gallery_images = $existingGallery;
+            if ($mainImageUrl) {
+                $store->main_image_url = $mainImageUrl;
+            }
+            $store->save();
+
+            Log::info('Store images uploaded successfully', [
+                'store_id' => $storeId,
+                'image_count' => count($imageUrls),
+                'main_image' => $mainImageUrl,
+            ]);
+
+            return response()->json([
+                'message' => 'Images uploaded successfully',
+                'data' => [
+                    'store_id' => $store->id,
+                    'gallery_images' => $store->gallery_images,
+                    'main_image_url' => $store->main_image_url,
+                    'total_images' => count($store->gallery_images ?? []),
+                ],
+            ], 201);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (\Exception $e) {
+            Log::error('Error uploading store images', [
+                'store_id' => $storeId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'message' => 'Failed to upload images',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
     }
 
     /**
-     * Upload store image to Cloudinary
+     * Update store main image
      */
-    public function uploadImage(Request $request, $storeId): JsonResponse
+    public function updateMainImage(Request $request, $storeId): JsonResponse
     {
         try {
+            $request->validate([
+                'main_image_url' => 'required|url',
+            ]);
+
             $store = Store::findOrFail($storeId);
-
-            $validator = Validator::make($request->all(), [
-                // Accept either image file or image_url (Cloudinary URL)
-                'image' => 'file|mimes:jpg,jpeg,png|max:10240',
-                'image_url' => 'url',
-                'is_main_image' => 'boolean',
-            ]);
-
-            if ($validator->fails()) {
+            
+            // Check if user owns this store
+            if ($store->user_id !== Auth::id()) {
                 return response()->json([
-                    'message' => 'Validation error',
-                    'errors' => $validator->errors(),
-                ], 422);
+                    'message' => 'Unauthorized. You can only manage your own store images.',
+                ], 403);
             }
 
-            $isMainImage = $request->boolean('is_main_image', false);
+            $mainImageUrl = $request->input('main_image_url');
+            $galleryImages = $store->gallery_images ?? [];
 
-            // If image_url provided, store it directly, else upload file
-            $finalUrl = null;
-            if ($request->filled('image_url')) {
-                $finalUrl = $request->input('image_url');
-            } elseif ($request->hasFile('image')) {
-                $cloudinaryResult = $this->cloudinaryService->uploadStoreImage(
-                    $request->file('image'),
-                    $storeId,
-                    $isMainImage
-                );
-
-                if (!$cloudinaryResult['success']) {
-                    return response()->json([
-                        'message' => 'Image upload failed',
-                        'error' => $cloudinaryResult['error'],
-                    ], 500);
+            // Check if main image is in the gallery
+            $imageExists = false;
+            foreach ($galleryImages as $image) {
+                if ($image['url'] === $mainImageUrl) {
+                    $imageExists = true;
+                    break;
                 }
-                $finalUrl = $cloudinaryResult['secure_url'] ?? $cloudinaryResult['url'];
-            } else {
+            }
+
+            if (!$imageExists) {
                 return response()->json([
-                    'message' => 'Validation error',
-                    'errors' => ['Either image file or image_url must be provided'],
+                    'message' => 'Main image URL must be one of the existing gallery images.',
                 ], 422);
             }
 
-            // Update store with image URL
-            if ($isMainImage) {
-                $store->setMainImage($finalUrl);
-            } else {
-                $store->addGalleryImage($finalUrl);
-            }
+            $store->main_image_url = $mainImageUrl;
+            $store->save();
 
-            return response()->json([
-                'message' => 'Image uploaded successfully',
-                'data' => [
-                    'url' => $finalUrl,
-                    'public_id' => null,
-                    'is_main_image' => $isMainImage,
-                ],
-            ]);
-
-        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
-            return response()->json([
-                'message' => 'Store not found',
-            ], 404);
-        } catch (\Exception $e) {
-            Log::error('Store image upload error: ' . $e->getMessage(), [
-                'trace' => $e->getTraceAsString(),
+            Log::info('Store main image updated successfully', [
                 'store_id' => $storeId,
+                'main_image_url' => $mainImageUrl,
             ]);
 
             return response()->json([
-                'message' => 'Image upload failed',
-                'error' => config('app.debug') ? $e->getMessage() : 'Internal server error',
+                'message' => 'Main image updated successfully',
+                'data' => [
+                    'store_id' => $store->id,
+                    'main_image_url' => $store->main_image_url,
+                ],
+            ], 200);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (\Exception $e) {
+            Log::error('Error updating store main image', [
+                'store_id' => $storeId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'message' => 'Failed to update main image',
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -107,27 +174,25 @@ class StoreImageController extends Controller
     {
         try {
             $store = Store::findOrFail($storeId);
-
-            $images = [
-                'main_image' => $store->getMainImageUrl(),
-                'gallery_images' => $store->getGalleryImages(),
-            ];
-
+            
             return response()->json([
-                'message' => 'Store images retrieved successfully',
-                'data' => $images,
+                'data' => [
+                    'store_id' => $store->id,
+                    'gallery_images' => $store->gallery_images ?? [],
+                    'main_image_url' => $store->main_image_url,
+                    'total_images' => count($store->gallery_images ?? []),
+                ],
+            ], 200);
+
+        } catch (\Exception $e) {
+            Log::error('Error getting store images', [
+                'store_id' => $storeId,
+                'error' => $e->getMessage(),
             ]);
 
-        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             return response()->json([
-                'message' => 'Store not found',
-            ], 404);
-        } catch (\Exception $e) {
-            Log::error('Get store images error: ' . $e->getMessage());
-
-            return response()->json([
-                'message' => 'Failed to retrieve store images',
-                'error' => config('app.debug') ? $e->getMessage() : 'Internal server error',
+                'message' => 'Failed to get store images',
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -138,50 +203,68 @@ class StoreImageController extends Controller
     public function deleteImage(Request $request, $storeId): JsonResponse
     {
         try {
-            $store = Store::findOrFail($storeId);
-
-            $validator = Validator::make($request->all(), [
-                'image_url' => 'required|string',
-                'is_main_image' => 'boolean',
+            $request->validate([
+                'image_url' => 'required|url',
             ]);
 
-            if ($validator->fails()) {
+            $store = Store::findOrFail($storeId);
+            
+            // Check if user owns this store
+            if ($store->user_id !== Auth::id()) {
                 return response()->json([
-                    'message' => 'Validation error',
-                    'errors' => $validator->errors(),
-                ], 422);
+                    'message' => 'Unauthorized. You can only manage your own store images.',
+                ], 403);
             }
 
             $imageUrl = $request->input('image_url');
-            $isMainImage = $request->boolean('is_main_image', false);
+            $galleryImages = $store->gallery_images ?? [];
 
-            // Remove from store
-            if ($isMainImage) {
-                if ($store->getMainImageUrl() === $imageUrl) {
-                    $store->main_image_url = null;
-                    $store->save();
-                }
-            } else {
-                $store->removeGalleryImage($imageUrl);
+            // Remove image from gallery
+            $galleryImages = array_filter($galleryImages, function($image) use ($imageUrl) {
+                return $image['url'] !== $imageUrl;
+            });
+
+            // Reset array keys
+            $galleryImages = array_values($galleryImages);
+
+            // If deleted image was main image, set first remaining image as main
+            if ($store->main_image_url === $imageUrl) {
+                $store->main_image_url = !empty($galleryImages) ? $galleryImages[0]['url'] : null;
             }
 
-            // TODO: Delete from Cloudinary if needed
-            // For now, we'll just remove from database
+            $store->gallery_images = $galleryImages;
+            $store->save();
+
+            Log::info('Store image deleted successfully', [
+                'store_id' => $storeId,
+                'deleted_image_url' => $imageUrl,
+            ]);
 
             return response()->json([
                 'message' => 'Image deleted successfully',
-            ]);
+                'data' => [
+                    'store_id' => $store->id,
+                    'gallery_images' => $store->gallery_images,
+                    'main_image_url' => $store->main_image_url,
+                    'total_images' => count($store->gallery_images ?? []),
+                ],
+            ], 200);
 
-        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+        } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
-                'message' => 'Store not found',
-            ], 404);
+                'message' => 'Validation failed',
+                'errors' => $e->errors(),
+            ], 422);
         } catch (\Exception $e) {
-            Log::error('Delete store image error: ' . $e->getMessage());
+            Log::error('Error deleting store image', [
+                'store_id' => $storeId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
 
             return response()->json([
                 'message' => 'Failed to delete image',
-                'error' => config('app.debug') ? $e->getMessage() : 'Internal server error',
+                'error' => $e->getMessage(),
             ], 500);
         }
     }

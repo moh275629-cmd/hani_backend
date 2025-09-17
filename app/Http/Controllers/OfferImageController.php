@@ -3,190 +3,252 @@
 namespace App\Http\Controllers;
 
 use App\Models\Offer;
-use App\Services\CloudinaryService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
 
 class OfferImageController extends Controller
 {
-    protected $cloudinaryService;
-
-    public function __construct(CloudinaryService $cloudinaryService)
-    {
-        $this->cloudinaryService = $cloudinaryService;
-    }
-
     /**
-     * Upload offer image/video to Cloudinary
+     * Upload multiple offer images
      */
-    public function uploadMedia(Request $request, $offerId): JsonResponse
+    public function uploadBatch(Request $request, $offerId): JsonResponse
     {
         try {
+            $request->validate([
+                'image_urls' => 'required|array|min:1|max:10',
+                'image_urls.*' => 'required|url',
+                'main_image_url' => 'nullable|url',
+            ]);
+
             $offer = Offer::findOrFail($offerId);
-
-            $validator = Validator::make($request->all(), [
-                // Accept either media file or media_url (Cloudinary URL)
-                'media' => 'file|mimes:jpg,jpeg,png,mp4,mov,avi|max:51200',
-                'media_url' => 'url',
-                'is_main_media' => 'boolean',
-                'media_type' => 'in:image,video',
-            ]);
-
-            if ($validator->fails()) {
+            
+            // Check if user owns this offer's store
+            if ($offer->store->user_id !== Auth::id()) {
                 return response()->json([
-                    'message' => 'Validation error',
-                    'errors' => $validator->errors(),
+                    'message' => 'Unauthorized. You can only manage images for your own offers.',
+                ], 403);
+            }
+
+            $imageUrls = $request->input('image_urls');
+            $mainImageUrl = $request->input('main_image_url');
+
+            // Validate that main image is in the list
+            if ($mainImageUrl && !in_array($mainImageUrl, $imageUrls)) {
+                return response()->json([
+                    'message' => 'Main image URL must be one of the uploaded image URLs.',
                 ], 422);
             }
 
-            $isMainMedia = $request->boolean('is_main_media', false);
-            $mediaType = $request->input('media_type', 'image');
-
-            // If media_url provided, store it directly, else upload file
-            $finalUrl = null;
-            if ($request->filled('media_url')) {
-                $finalUrl = $request->input('media_url');
-            } elseif ($request->hasFile('media')) {
-                $cloudinaryResult = $this->cloudinaryService->uploadOfferMedia(
-                    $request->file('media'),
-                    $offerId,
-                    $isMainMedia
-                );
-
-                if (!$cloudinaryResult['success']) {
-                    return response()->json([
-                        'message' => 'Media upload failed',
-                        'error' => $cloudinaryResult['error'],
-                    ], 500);
-                }
-                $finalUrl = $cloudinaryResult['secure_url'] ?? $cloudinaryResult['url'];
-            } else {
-                return response()->json([
-                    'message' => 'Validation error',
-                    'errors' => ['Either media file or media_url must be provided'],
-                ], 422);
+            // Add new images to gallery using the existing method
+            foreach ($imageUrls as $imageUrl) {
+                $offer->addGalleryMedia($imageUrl, 'image');
             }
 
-            // Update offer with media URL
-            if ($isMainMedia) {
-                $offer->setMainMedia($finalUrl);
-            } else {
-                $offer->addGalleryMedia($finalUrl, $mediaType);
+            // Set main image if provided
+            if ($mainImageUrl) {
+                $offer->setMainMedia($mainImageUrl);
             }
 
-            return response()->json([
-                'message' => 'Media uploaded successfully',
-                'data' => [
-                    'url' => $finalUrl,
-                    'public_id' => null,
-                    'is_main_media' => $isMainMedia,
-                    'media_type' => $mediaType,
-                ],
-            ]);
-
-        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
-            return response()->json([
-                'message' => 'Offer not found',
-            ], 404);
-        } catch (\Exception $e) {
-            Log::error('Offer media upload error: ' . $e->getMessage(), [
-                'trace' => $e->getTraceAsString(),
+            Log::info('Offer images uploaded successfully', [
                 'offer_id' => $offerId,
+                'image_count' => count($imageUrls),
+                'main_image' => $mainImageUrl,
             ]);
 
             return response()->json([
-                'message' => 'Media upload failed',
-                'error' => config('app.debug') ? $e->getMessage() : 'Internal server error',
-            ], 500);
-        }
-    }
+                'message' => 'Images uploaded successfully',
+                'data' => [
+                    'offer_id' => $offer->id,
+                    'gallery_media' => $offer->getGalleryMedia(),
+                    'main_media_url' => $offer->getMainMediaUrl(),
+                    'total_images' => count($offer->getImages()),
+                ],
+            ], 201);
 
-    /**
-     * Get offer media
-     */
-    public function getMedia($offerId): JsonResponse
-    {
-        try {
-            $offer = Offer::findOrFail($offerId);
-
-            $media = [
-                'main_media' => $offer->getMainMediaUrl(),
-                'gallery_media' => $offer->getGalleryMedia(),
-                'images' => $offer->getImages(),
-                'videos' => $offer->getVideos(),
-            ];
-
+        } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
-                'message' => 'Offer media retrieved successfully',
-                'data' => $media,
-            ]);
-
-        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
-            return response()->json([
-                'message' => 'Offer not found',
-            ], 404);
+                'message' => 'Validation failed',
+                'errors' => $e->errors(),
+            ], 422);
         } catch (\Exception $e) {
-            Log::error('Get offer media error: ' . $e->getMessage());
+            Log::error('Error uploading offer images', [
+                'offer_id' => $offerId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
 
             return response()->json([
-                'message' => 'Failed to retrieve offer media',
-                'error' => config('app.debug') ? $e->getMessage() : 'Internal server error',
+                'message' => 'Failed to upload images',
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
 
     /**
-     * Delete offer media
+     * Update offer main image
      */
-    public function deleteMedia(Request $request, $offerId): JsonResponse
+    public function updateMainImage(Request $request, $offerId): JsonResponse
     {
         try {
-            $offer = Offer::findOrFail($offerId);
-
-            $validator = Validator::make($request->all(), [
-                'media_url' => 'required|string',
-                'is_main_media' => 'boolean',
+            $request->validate([
+                'main_image_url' => 'required|url',
             ]);
 
-            if ($validator->fails()) {
+            $offer = Offer::findOrFail($offerId);
+            
+            // Check if user owns this offer's store
+            if ($offer->store->user_id !== Auth::id()) {
                 return response()->json([
-                    'message' => 'Validation error',
-                    'errors' => $validator->errors(),
+                    'message' => 'Unauthorized. You can only manage images for your own offers.',
+                ], 403);
+            }
+
+            $mainImageUrl = $request->input('main_image_url');
+            $galleryImages = $offer->getImages();
+
+            // Check if main image is in the gallery
+            $imageExists = false;
+            foreach ($galleryImages as $image) {
+                if ($image['url'] === $mainImageUrl) {
+                    $imageExists = true;
+                    break;
+                }
+            }
+
+            if (!$imageExists) {
+                return response()->json([
+                    'message' => 'Main image URL must be one of the existing gallery images.',
                 ], 422);
             }
 
-            $mediaUrl = $request->input('media_url');
-            $isMainMedia = $request->boolean('is_main_media', false);
+            $offer->setMainMedia($mainImageUrl);
 
-            // Remove from offer
-            if ($isMainMedia) {
-                if ($offer->getMainMediaUrl() === $mediaUrl) {
-                    $offer->main_media_url = null;
-                    $offer->save();
-                }
-            } else {
-                $offer->removeGalleryMedia($mediaUrl);
-            }
-
-            // TODO: Delete from Cloudinary if needed
-            // For now, we'll just remove from database
-
-            return response()->json([
-                'message' => 'Media deleted successfully',
+            Log::info('Offer main image updated successfully', [
+                'offer_id' => $offerId,
+                'main_image_url' => $mainImageUrl,
             ]);
 
-        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             return response()->json([
-                'message' => 'Offer not found',
-            ], 404);
+                'message' => 'Main image updated successfully',
+                'data' => [
+                    'offer_id' => $offer->id,
+                    'main_media_url' => $offer->getMainMediaUrl(),
+                ],
+            ], 200);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $e->errors(),
+            ], 422);
         } catch (\Exception $e) {
-            Log::error('Delete offer media error: ' . $e->getMessage());
+            Log::error('Error updating offer main image', [
+                'offer_id' => $offerId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
 
             return response()->json([
-                'message' => 'Failed to delete media',
-                'error' => config('app.debug') ? $e->getMessage() : 'Internal server error',
+                'message' => 'Failed to update main image',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Get offer images
+     */
+    public function getImages($offerId): JsonResponse
+    {
+        try {
+            $offer = Offer::findOrFail($offerId);
+            
+            return response()->json([
+                'data' => [
+                    'offer_id' => $offer->id,
+                    'gallery_media' => $offer->getGalleryMedia(),
+                    'main_media_url' => $offer->getMainMediaUrl(),
+                    'images' => $offer->getImages(),
+                    'videos' => $offer->getVideos(),
+                    'total_images' => count($offer->getImages()),
+                ],
+            ], 200);
+
+        } catch (\Exception $e) {
+            Log::error('Error getting offer images', [
+                'offer_id' => $offerId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => 'Failed to get offer images',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete offer image
+     */
+    public function deleteImage(Request $request, $offerId): JsonResponse
+    {
+        try {
+            $request->validate([
+                'image_url' => 'required|url',
+            ]);
+
+            $offer = Offer::findOrFail($offerId);
+            
+            // Check if user owns this offer's store
+            if ($offer->store->user_id !== Auth::id()) {
+                return response()->json([
+                    'message' => 'Unauthorized. You can only manage images for your own offers.',
+                ], 403);
+            }
+
+            $imageUrl = $request->input('image_url');
+
+            // Remove image from gallery using existing method
+            $offer->removeGalleryMedia($imageUrl);
+
+            // If deleted image was main image, set first remaining image as main
+            if ($offer->getMainMediaUrl() === $imageUrl) {
+                $remainingImages = $offer->getImages();
+                $offer->setMainMedia(!empty($remainingImages) ? $remainingImages[0]['url'] : null);
+            }
+
+            Log::info('Offer image deleted successfully', [
+                'offer_id' => $offerId,
+                'deleted_image_url' => $imageUrl,
+            ]);
+
+            return response()->json([
+                'message' => 'Image deleted successfully',
+                'data' => [
+                    'offer_id' => $offer->id,
+                    'gallery_media' => $offer->getGalleryMedia(),
+                    'main_media_url' => $offer->getMainMediaUrl(),
+                    'total_images' => count($offer->getImages()),
+                ],
+            ], 200);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (\Exception $e) {
+            Log::error('Error deleting offer image', [
+                'offer_id' => $offerId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'message' => 'Failed to delete image',
+                'error' => $e->getMessage(),
             ], 500);
         }
     }

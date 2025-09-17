@@ -240,10 +240,22 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/store/{storeId}/images', [StoreImageController::class, 'getImages']);
     Route::delete('/store/{storeId}/images', [StoreImageController::class, 'deleteImage']);
     
+    // Store multiple images management routes
+    Route::post('/store/{storeId}/images/batch', [App\Http\Controllers\StoreImageController::class, 'uploadBatch']);
+    Route::put('/store/{storeId}/images/main', [App\Http\Controllers\StoreImageController::class, 'updateMainImage']);
+    Route::get('/store/{storeId}/images/gallery', [App\Http\Controllers\StoreImageController::class, 'getImages']);
+    Route::delete('/store/{storeId}/images/gallery', [App\Http\Controllers\StoreImageController::class, 'deleteImage']);
+    
     // Offer media management routes
     Route::post('/offer/{offerId}/media', [OfferImageController::class, 'uploadMedia']);
     Route::get('/offer/{offerId}/media', [OfferImageController::class, 'getMedia']);
     Route::delete('/offer/{offerId}/media', [OfferImageController::class, 'deleteMedia']);
+    
+    // Offer multiple images management routes
+    Route::post('/offers/{offerId}/images/batch', [App\Http\Controllers\OfferImageController::class, 'uploadBatch']);
+    Route::put('/offers/{offerId}/images/main', [App\Http\Controllers\OfferImageController::class, 'updateMainImage']);
+    Route::get('/offers/{offerId}/images/gallery', [App\Http\Controllers\OfferImageController::class, 'getImages']);
+    Route::delete('/offers/{offerId}/images/gallery', [App\Http\Controllers\OfferImageController::class, 'deleteImage']);
     Route::post('/images/store-logo/temp', [ImageController::class, 'uploadTempStoreLogo']); // For store owners
     Route::post('/images/store/{storeId}/logo/move-temp', [ImageController::class, 'moveTempStoreLogo']);
     Route::post('/images/offer/temp', [ImageController::class, 'uploadTempOfferImage']); // Moved here to fix route conflict
