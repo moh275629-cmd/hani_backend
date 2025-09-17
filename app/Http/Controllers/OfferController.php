@@ -152,9 +152,9 @@ class OfferController extends Controller
                 $offer->title = $this->cleanString($offer->title);
                 $offer->description = $this->cleanString($offer->description);
                 
-                $offer->image_url = $offer->hasImageBlob() 
-                    ? url("/api/images/offer/{$offer->id}")
-                    : null;
+                // Prioritize Cloudinary URLs over blob
+                $offer->image_url = $offer->getMainMediaUrl() 
+                    ?: ($offer->hasImageBlob() ? url("/api/images/offer/{$offer->id}") : null);
                 
                 // Add rating information
                 $offer->average_rating = $offer->getAverageRating();
@@ -245,10 +245,9 @@ public function show($offerId): JsonResponse
 
     $offer->load(['store']);
 
-    // Add image URL to offer
-    $offer->image_url = $offer->hasImageBlob() 
-        ? url("/api/images/offer/{$offer->id}")
-        : null;
+    // Add image URL to offer - prioritize Cloudinary URLs over blob
+    $offer->image_url = $offer->getMainMediaUrl() 
+        ?: ($offer->hasImageBlob() ? url("/api/images/offer/{$offer->id}") : null);
 
     // Add rating information
     $offer->average_rating = $offer->getAverageRating();

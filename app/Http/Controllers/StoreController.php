@@ -140,9 +140,9 @@ class StoreController extends Controller
 
         // Add image URLs to offers
         $store->offers->transform(function ($offer) {
-            $offer->image_url = $offer->hasImageBlob() 
-                ? url("/api/images/offer/{$offer->id}")
-                : null;
+            // Prioritize Cloudinary URLs over blob
+            $offer->image_url = $offer->getMainMediaUrl() 
+                ?: ($offer->hasImageBlob() ? url("/api/images/offer/{$offer->id}") : null);
             return $offer;
         });
 
@@ -197,9 +197,9 @@ class StoreController extends Controller
 
         // Add image URLs to offers
         $store->offers->transform(function ($offer) {
-            $offer->image_url = $offer->hasImageBlob() 
-                ? url("/api/images/offer/{$offer->id}")
-                : null;
+            // Prioritize Cloudinary URLs over blob
+            $offer->image_url = $offer->getMainMediaUrl() 
+                ?: ($offer->hasImageBlob() ? url("/api/images/offer/{$offer->id}") : null);
             return $offer;
         });
 
