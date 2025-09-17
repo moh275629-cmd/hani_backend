@@ -157,7 +157,7 @@ class EditStore extends Model
     // Store fields
     $storeFields = [
         'store_name', 'description', 'business_type', 'phone', 'email', 'website',
-        'logo', 'banner', 'address', 'city', 'state', 'state_code', 'postal_code',
+        'logo', 'banner', 'gallery_images', 'main_image_url', 'address', 'city', 'state', 'state_code', 'postal_code',
         'country', 'google_place_id', 'business_hours', 'payment_methods', 'services',
     ];
     
