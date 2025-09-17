@@ -33,7 +33,7 @@ class LoyaltyCardController extends Controller
 
             if (!$loyaltyCard) {
                 // Auto-create a loyalty card for the user if it does not exist
-                $cardNumber = $this->generateCardNumber($user->id);
+                $cardNumber = $this->generateCardNumber($user->id, $user->state);
                 $loyaltyCard = LoyaltyCard::create([
                     'user_id' => $user->id,
                     'card_number' => $cardNumber,
@@ -82,7 +82,7 @@ class LoyaltyCardController extends Controller
         }
 
         // Generate unique card number
-        $cardNumber = $this->generateCardNumber($user->id);
+        $cardNumber = $this->generateCardNumber($user->id, $user->state);
         
         // Create new loyalty card
         $loyaltyCard = LoyaltyCard::create([
@@ -128,10 +128,20 @@ class LoyaltyCardController extends Controller
     /**
      * Generate a unique loyalty card number
      */
-    private function generateCardNumber(int $userId): string
-    {
-        return 'HANI' . str_pad($userId, 6, '0', STR_PAD_LEFT);
-    }
+    private function generateCardNumber(int $userId, int $userState): string
+{
+    $year = date('Y'); // e.g. 2025
+    $yearShort = substr($year, -2); // "25"
+
+    // Build the base numeric string first
+    $base = $yearShort . str_pad($userState, 2, '0', STR_PAD_LEFT) . $userId;
+
+    // If you want to ensure a minimum length with leading zeros
+    $padded = str_pad($base, 6, '0', STR_PAD_LEFT);
+
+    return 'HANI' . $padded;
+}
+
 
     /**
      * Generate QR code with proper data structure
