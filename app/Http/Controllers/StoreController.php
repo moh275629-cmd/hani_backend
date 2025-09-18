@@ -362,6 +362,33 @@ class StoreController extends Controller
             $query->where('state', 'like', '%' . $request->state . '%');
         }
 
+        // Filter by wilaya_code against store or its branches
+        if ($request->has('wilaya_code')) {
+            $wilayaCode = $request->get('wilaya_code');
+
+            // Match stores whose primary wilaya matches OR have at least one active branch in this wilaya
+            $query->where(function ($q) use ($wilayaCode) {
+                $q->where('state', $wilayaCode)
+                  ->orWhereExists(function ($sub) use ($wilayaCode) {
+                      $sub->selectRaw('1')
+                          ->from('store_branches')
+                          ->whereColumn('store_branches.store_id', 'stores.id')
+                          ->where('store_branches.is_active', true)
+                          ->where('store_branches.wilaya_code', $wilayaCode);
+                  });
+            });
+
+            // Also include offers scoped to branches in this wilaya
+            $query->with(['offers' => function ($offerQ) use ($wilayaCode) {
+                $offerQ->where('is_active', true)
+                       ->where('valid_from', '<=', now())
+                       ->where('valid_until', '>=', now())
+                       ->whereHas('branches', function ($b) use ($wilayaCode) {
+                           $b->where('wilaya_code', $wilayaCode);
+                       });
+            }]);
+        }
+
         // Sort options
         $sortBy = $request->get('sort_by', 'name');
         $sortOrder = $request->get('sort_order', 'asc');
@@ -558,6 +585,12 @@ class StoreController extends Controller
             
             \Log::info('Offer created successfully with ID: ' . $offer->id);
             
+            // Attach branches if provided
+            if ($request->has('branch_ids') && is_array($request->branch_ids)) {
+                $branchIds = array_map('intval', $request->branch_ids);
+                $offer->branches()->sync($branchIds);
+            }
+
             // Debug: Log the created offer
             \Log::info('Offer created', [
                 'offer_id' => $offer->id,
@@ -668,6 +701,12 @@ class StoreController extends Controller
         
         $offer->save();
 
+        // Sync branches if provided
+        if ($request->has('branch_ids') && is_array($request->branch_ids)) {
+            $branchIds = array_map('intval', $request->branch_ids);
+            $offer->branches()->sync($branchIds);
+        }
+ 
         return response()->json([
             'message' => 'Offer updated successfully',
             'data' => $offer

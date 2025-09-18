@@ -899,7 +899,7 @@ class AuthController extends Controller
         \Log::info("User account deletion requested", [
             'user_id' => $user->id,
             'email' => $user->email,
-            'password' => $request->password,
+            // Do not log the plaintext password for security reasons
             'reason' => $request->reason,
         ]);
         $validator = Validator::make($request->all(), [

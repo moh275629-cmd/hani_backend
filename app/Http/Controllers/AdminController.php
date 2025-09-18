@@ -650,13 +650,37 @@ class AdminController extends Controller
                 ], 404);
             }
 
+            $storeApprovedAt = $request->is_approved ? now() : null;
             $storeModel->update([
                 'is_approved' => $request->is_approved,
-                'approved_at' => $request->is_approved ? now() : null
+                'approved_at' => $storeApprovedAt,
             ]);
 
             // Get the store owner
             $storeOwner = User::find($storeModel->user_id);
+
+            // If approved, activate store and set/store activation window for the owner (1 year from store approved_at)
+            if ($request->is_approved && $storeOwner) {
+                // Activate the store
+                $storeModel->is_active = true;
+                $storeModel->save();
+
+                // Approve and activate the owner, align activation with store approved_at
+                $storeOwner->is_approved = true;
+                $storeOwner->is_active = true;
+                $storeOwner->save();
+
+                if ($storeApprovedAt) {
+                    // Create/update activation window starting from store approved_at
+                    $storeOwner->activation()->updateOrCreate(
+                        ['user_id' => $storeOwner->id],
+                        [
+                            'approved_at' => $storeApprovedAt,
+                            'deactivate_at' => (clone $storeApprovedAt)->addYear(),
+                        ]
+                    );
+                }
+            }
 
             // Send notification to store owner
             if ($request->has('reason')) {

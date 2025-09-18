@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Models\Store;
+use App\Models\BusinessType;
+use App\Models\StoreBranch;
 use App\Models\Otp;
 use App\Models\TermsAndConditions;
 use App\Models\RequiredDocuments;
@@ -40,6 +42,8 @@ class StoreRegistrationController extends Controller
             'store_name'      => 'required|string',
             'description'     => 'required|string',
             'business_type'   => 'required|string',
+            'custom_business_type' => 'nullable|string',
+            'has_custom_business_type' => 'nullable|boolean',
             'address'         => 'required|string',
             'city'            => 'required|string',
             'country'         => 'nullable|string',
@@ -51,6 +55,12 @@ class StoreRegistrationController extends Controller
             'longitude'       => 'nullable|string',
             'website'         => 'nullable|string',
             'accept_terms'    => 'required|accepted',
+            'branches'        => 'nullable|array',
+            'branches.*.wilaya_code' => 'required_with:branches|string',
+            'branches.*.city' => 'nullable|string',
+            'branches.*.address' => 'nullable|string',
+            'branches.*.phone' => 'nullable|string',
+            'branches.*.is_active' => 'nullable|boolean',
         ]);
         
 
@@ -164,12 +174,45 @@ class StoreRegistrationController extends Controller
 
             \Log::info('User created successfully', ['user_id' => $user->id]);
 
+            // Resolve business type and custom business type flags
+            $incomingBusinessType = $request->business_type;
+            $incomingCustomName = $request->custom_business_type;
+            $incomingHasCustom = filter_var($request->has_custom_business_type, FILTER_VALIDATE_BOOLEAN);
+
+            $resolvedBusinessTypeKey = $incomingBusinessType;
+            $setHasCustom = false;
+            $setCustomName = null;
+
+            $typeExistsByKey = BusinessType::where('key', $incomingBusinessType)->exists();
+            if ($incomingHasCustom && !empty($incomingCustomName)) {
+                // Explicit custom type selected (usually when user chooses "other")
+                $resolvedBusinessTypeKey = 'other';
+                $setHasCustom = true;
+                $setCustomName = $incomingCustomName;
+            } elseif (!$typeExistsByKey) {
+                // If the provided key doesn't exist, try to map by name first
+                $keyFromName = BusinessType::where('name', $incomingBusinessType)->value('key');
+                if ($keyFromName) {
+                    $resolvedBusinessTypeKey = $keyFromName;
+                } elseif (!empty($incomingCustomName)) {
+                    // Fall back to custom flow if a custom name is provided
+                    $resolvedBusinessTypeKey = 'other';
+                    $setHasCustom = true;
+                    $setCustomName = $incomingCustomName;
+                } else {
+                    // Final fallback
+                    $resolvedBusinessTypeKey = 'other';
+                }
+            }
+
             // Create store
             $store = Store::create([
                 'user_id' => $user->id,
                 'store_name' => $request->store_name,
                 'description' => $request->description,
-                'business_type' => $request->business_type,
+                'business_type' => $resolvedBusinessTypeKey,
+                'custom_business_type' => $setCustomName,
+                'has_custom_business_type' => $setHasCustom,
                 'phone' => $request->phone,
                 'email' => $request->email,
                 'website' => $request->website,
@@ -189,6 +232,23 @@ class StoreRegistrationController extends Controller
             ]);
 
             \Log::info('Store created successfully', ['store_id' => $store->id]);
+
+            // Optionally create initial branches if provided
+            if (is_array($request->branches) && count($request->branches) > 0) {
+                foreach ($request->branches as $branch) {
+                    if (!isset($branch['wilaya_code']) || $branch['wilaya_code'] === '') {
+                        continue;
+                    }
+                    StoreBranch::create([
+                        'store_id' => $store->id,
+                        'wilaya_code' => (string) $branch['wilaya_code'],
+                        'city' => $branch['city'] ?? null,
+                        'address' => $branch['address'] ?? null,
+                        'phone' => $branch['phone'] ?? null,
+                        'is_active' => isset($branch['is_active']) ? (bool) $branch['is_active'] : true,
+                    ]);
+                }
+            }
 
             // Send OTP email
             $this->_sendEmailOtp($user->email, 'store');

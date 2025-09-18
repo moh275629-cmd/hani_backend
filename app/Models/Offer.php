@@ -9,6 +9,13 @@ class Offer extends Model
 {
     use HasFactory;
 
+    protected $guarded = [];
+
+    public function branches()
+    {
+        return $this->belongsToMany(StoreBranch::class, 'offer_branches', 'offer_id', 'branch_id')->withTimestamps();
+    }
+
     protected $fillable = [
         'store_id',
         'title',

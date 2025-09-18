@@ -208,6 +208,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/stores/{storeId}', [StoreController::class, 'show'])->where('storeId', '[0-9]+');
     Route::get('/stores/{store}/transactions', [StoreController::class, 'transactions']);
     Route::put('/store/{storeId}/business-hours', [StoreController::class, 'updateBusinessHours']);
+
+    // Store branches
+    Route::get('/store/{storeId}/branches', [\App\Http\Controllers\StoreBranchController::class, 'indexByStore']);
+    Route::get('/stores/me/branches', [\App\Http\Controllers\StoreBranchController::class, 'myBranches']);
+    Route::post('/stores/me/branches', [\App\Http\Controllers\StoreBranchController::class, 'store']);
+    Route::put('/stores/me/branches/{branchId}', [\App\Http\Controllers\StoreBranchController::class, 'update']);
+    Route::delete('/stores/me/branches/{branchId}', [\App\Http\Controllers\StoreBranchController::class, 'destroy']);
     
     // Store Edit Requests
     Route::post('/store/edit-request', [App\Http\Controllers\EditStoreController::class, 'submit']);
