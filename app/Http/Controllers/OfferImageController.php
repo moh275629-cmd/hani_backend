@@ -37,9 +37,10 @@ class OfferImageController extends Controller
            
 
             // Add new images to gallery using the existing method
-            foreach ($imageUrls as $imageUrl) {
-                $offer->addGalleryMedia($imageUrl, 'image');
-            }
+            $offer->setGalleryMedia(
+                collect($imageUrls)->map(fn($url) => ['url' => $url, 'type' => 'image'])->toArray()
+            );
+            
 
             // Set main image if provided
             if ($mainImageUrl) {

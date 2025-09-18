@@ -196,18 +196,19 @@ class Offer extends Model
         $this->save();
     }
 
-    public function addGalleryMedia($cloudinaryUrl, $mediaType = 'image')
+    public function setGalleryMedia(array $mediaItems)
     {
-        $gallery = $this->gallery_media ?? [];
-        $gallery[] = [
-            'url' => $cloudinaryUrl,
-            'type' => $mediaType,
-            'created_at' => now()->toISOString(),
-        ];
-        $this->gallery_media = $gallery;
+        $this->gallery_media = collect($mediaItems)->map(function ($item) {
+            return [
+                'url' => $item['url'],
+                'type' => $item['type'] ?? 'image',
+                'created_at' => now()->toISOString(),
+            ];
+        })->toArray();
+    
         $this->save();
     }
-
+    
     public function removeGalleryMedia($cloudinaryUrl)
     {
         $gallery = $this->gallery_media ?? [];
