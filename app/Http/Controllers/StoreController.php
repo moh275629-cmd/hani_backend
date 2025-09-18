@@ -55,6 +55,22 @@ class StoreController extends Controller
             $query->searchByEncryptedFields($search);
         }
 
+        // Filter by wilaya_code against store or its branches
+        if ($request->has('wilaya_code')) {
+            $wilayaCode = $request->get('wilaya_code');
+
+            $query->where(function ($q) use ($wilayaCode) {
+                $q->where('state', $wilayaCode)
+                  ->orWhereExists(function ($sub) use ($wilayaCode) {
+                      $sub->selectRaw('1')
+                          ->from('store_branches')
+                          ->whereColumn('store_branches.store_id', 'stores.id')
+                          ->where('store_branches.is_active', true)
+                          ->where('store_branches.wilaya_code', $wilayaCode);
+                  });
+            });
+        }
+
 
 
         $stores = $query->get();

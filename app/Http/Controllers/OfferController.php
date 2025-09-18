@@ -81,6 +81,17 @@ class OfferController extends Controller
             }
         }
 
+        // Filter by wilaya using offer branches mapping
+        if ($request->has('wilaya_code')) {
+            $wilayaCode = $request->get('wilaya_code');
+            \Log::info('Filtering offers by wilaya via branches', ['wilaya_code' => $wilayaCode]);
+
+            $query->whereHas('branches', function ($b) use ($wilayaCode) {
+                $b->where('wilaya_code', $wilayaCode)
+                  ->where('is_active', true);
+            });
+        }
+
         if ($request->has('city')) {
             $city = $request->get('city');
             \Log::info('Filtering offers by city', ['requested_city' => $city]);
