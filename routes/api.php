@@ -207,6 +207,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/stores/{storeId}/reject', [StoreController::class, 'reject']);
     Route::get('/stores/{storeId}', [StoreController::class, 'show'])->where('storeId', '[0-9]+');
     Route::get('/stores/{store}/transactions', [StoreController::class, 'transactions']);
+    Route::put('/store/{storeId}/business-hours', [StoreController::class, 'updateBusinessHours']);
     
     // Store Edit Requests
     Route::post('/store/edit-request', [App\Http\Controllers\EditStoreController::class, 'submit']);

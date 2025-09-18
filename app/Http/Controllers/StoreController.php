@@ -413,7 +413,60 @@ class StoreController extends Controller
     ]);
 }
 
-    
+    /**
+     * Update business hours for a store (immediate, no admin approval)
+     */
+    public function updateBusinessHours(Request $request, $storeId): JsonResponse
+    {
+        try {
+            $user = Auth::user();
+            $store = Store::find($storeId);
+            if (!$store) {
+                return response()->json([
+                    'message' => 'Store not found',
+                    'data' => null,
+                ], 404);
+            }
+
+            // Ensure the authenticated user owns this store
+            if ($store->user_id !== $user->id && !$user->is_admin) {
+                return response()->json([
+                    'message' => 'Unauthorized',
+                ], 403);
+            }
+
+            $validator = Validator::make($request->all(), [
+                'business_hours' => 'required|array|min:1',
+                'business_hours.*.day' => 'required|string',
+                'business_hours.*.open' => 'nullable|string',
+                'business_hours.*.close' => 'nullable|string',
+                'business_hours.*.is_closed' => 'required|boolean',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
+
+            $hours = $request->get('business_hours');
+
+            // Save as-is (array of maps) in JSON column
+            $store->business_hours = $hours;
+            $store->save();
+
+            return response()->json([
+                'message' => 'Business hours updated successfully',
+                'data' => $store->business_hours,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Failed to update business hours: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
     /**
      * Get the authenticated store's store record
      */
