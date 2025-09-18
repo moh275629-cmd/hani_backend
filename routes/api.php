@@ -216,6 +216,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/stores/me/branches/{branchId}', [\App\Http\Controllers\StoreBranchController::class, 'update']);
     Route::delete('/stores/me/branches/{branchId}', [\App\Http\Controllers\StoreBranchController::class, 'destroy']);
     
+    // Branch edit requests (require admin approval)
+    Route::post('/stores/me/branch-edit-requests', [\App\Http\Controllers\BranchEditRequestController::class, 'store']);
+    Route::get('/stores/me/branch-edit-requests', [\App\Http\Controllers\BranchEditRequestController::class, 'index']);
+    
     // Store Edit Requests
     Route::post('/store/edit-request', [App\Http\Controllers\EditStoreController::class, 'submit']);
     Route::get('/store/edit-requests', [App\Http\Controllers\EditStoreController::class, 'myRequests']);

@@ -17,6 +17,7 @@ class StoreBranch extends Model
         'phone',
         'latitude',
         'longitude',
+        'gps_address',
         'is_active',
     ];
 

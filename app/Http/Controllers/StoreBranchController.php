@@ -46,6 +46,7 @@ class StoreBranchController extends Controller
             'phone' => 'nullable|string|max:50',
             'latitude' => 'nullable|numeric|between:-90,90',
             'longitude' => 'nullable|numeric|between:-180,180',
+            'gps_address' => 'nullable|string|max:1000',
             'is_active' => 'boolean',
         ]);
         if ($validator->fails()) {
@@ -77,6 +78,7 @@ class StoreBranchController extends Controller
             'phone' => 'nullable|string|max:50',
             'latitude' => 'nullable|numeric|between:-90,90',
             'longitude' => 'nullable|numeric|between:-180,180',
+            'gps_address' => 'nullable|string|max:1000',
             'is_active' => 'boolean',
         ]);
         if ($validator->fails()) {
