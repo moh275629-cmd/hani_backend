@@ -34,12 +34,7 @@ class OfferImageController extends Controller
             $imageUrls = $request->input('image_urls');
             $mainImageUrl = $request->input('main_image_url');
 
-            // Validate that main image is in the list
-            if ($mainImageUrl && !in_array($mainImageUrl, $imageUrls)) {
-                return response()->json([
-                    'message' => 'Main image URL must be one of the uploaded image URLs.',
-                ], 422);
-            }
+           
 
             // Add new images to gallery using the existing method
             foreach ($imageUrls as $imageUrl) {
