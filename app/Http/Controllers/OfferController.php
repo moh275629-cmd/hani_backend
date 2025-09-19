@@ -38,51 +38,76 @@ class OfferController extends Controller
             $query->where('minimum_purchase', '<=', $request->min_purchase);
         }
 
-       if ($request->has('state')) {
-    $state = $request->get('state');
-
-    $query->where(function ($q) use ($state) {
-        // Offers from stores whose primary state matches (exact only)
-        $q->whereHas('store', function ($storeQuery) use ($state) {
-            $storeQuery->where(function ($stateQuery) use ($state) {
-                $stateQuery->where('state', $state)
-                          ->orWhere('state', (string)$state)
-                          ->orWhere('state', (int)$state);
+        if ($request->has('state')) {
+            $state = $request->get('state');
+        
+            $query->where(function ($q) use ($state) {
+                // First, get store IDs that have the decrypted state matching
+                $matchingStoreIds = \App\Models\Store::all()
+                    ->filter(function ($store) use ($state) {
+                        return $store->state === $state || 
+                               $store->state === (string)$state || 
+                               $store->state === (int)$state;
+                    })
+                    ->pluck('id')
+                    ->toArray();
+        
+                // Offers from stores whose primary state matches
+                $q->whereHas('store', function ($storeQuery) use ($matchingStoreIds) {
+                    $storeQuery->whereIn('id', $matchingStoreIds);
+                })
+                
+                // OR offers from stores that have active branches in this state
+                ->orWhereHas('store.branches', function ($branchQuery) use ($state) {
+                    $branchQuery->where('is_active', true)
+                                ->where(function ($branchStateQuery) use ($state) {
+                                    $branchStateQuery->where('wilaya_code', $state)
+                                                     ->orWhere('wilaya_code', (string)$state)
+                                                     ->orWhere('wilaya_code', (int)$state);
+                                });
+                });
             });
-        })
-        
-        // OR offers from stores that have active branches in this state
-        ->orWhereHas('store.branches', function ($branchQuery) use ($state) {
-            $branchQuery->where('is_active', true)
-                        ->where(function ($branchStateQuery) use ($state) {
-                            $branchStateQuery->where('wilaya_code', $state)
-                                             ->orWhere('wilaya_code', (string)$state)
-                                             ->orWhere('wilaya_code', (int)$state);
-                        });
-        });
-        
-    });
-}
+        }
 
-
-if ($request->has('city')) {
-    $city = $request->get('city');
-    \Log::info('Filtering offers by city', ['requested_city' => $city]);
-    
-    $query->where(function ($q) use ($city) {
-        // Offers from stores whose primary city matches (exact only)
-        $q->whereHas('store', function ($storeQuery) use ($city) {
-            $storeQuery->where('city', $city);
-        })
+        if ($request->has('city')) {
+            $city = $request->get('city');
+            \Log::info('Filtering offers by city', ['requested_city' => $city]);
+            
+            // First, get store IDs that have the decrypted city matching
+            $matchingStoreIds = \App\Models\Store::all()
+                ->filter(function ($store) use ($city) {
+                    return $store->city === $city;
+                })
+                ->pluck('id')
+                ->toArray();
         
-        // OR offers from stores that have active branches in this city (exact only)
-        ->orWhereHas('store.branches', function ($branchQuery) use ($city) {
-            $branchQuery->where('city', $city)
-                       ->where('is_active', true);
-        });
-    });
-}
-
+            \Log::info('Stores with matching city', [
+                'city' => $city,
+                'matching_store_ids' => $matchingStoreIds,
+                'count' => count($matchingStoreIds)
+            ]);
+            
+            $query->where(function ($q) use ($city, $matchingStoreIds) {
+                // Offers from stores whose primary city matches
+                $q->whereHas('store', function ($storeQuery) use ($matchingStoreIds) {
+                    $storeQuery->whereIn('id', $matchingStoreIds);
+                })
+                
+                // OR offers from stores that have active branches in this city
+                ->orWhereHas('store.branches', function ($branchQuery) use ($city) {
+                    // For branches, we also need to handle decryption if city is encrypted there too
+                    $matchingBranchStoreIds = \App\Models\StoreBranch::all()
+                        ->filter(function ($branch) use ($city) {
+                            return $branch->city === $city;
+                        })
+                        ->pluck('store_id')
+                        ->toArray();
+                    
+                    $branchQuery->whereIn('store_id', $matchingBranchStoreIds)
+                               ->where('is_active', true);
+                });
+            });
+        }
 
         // Search by title or description
         if ($request->has('search')) {

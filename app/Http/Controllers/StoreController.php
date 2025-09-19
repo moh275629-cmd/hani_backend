@@ -48,10 +48,7 @@ class StoreController extends Controller
         if ($request->has('business_type')) {
             $query->where('business_type', 'like', '%' . $request->business_type . '%');
         }
-        // Filter by location if provided
-        if ($request->has('city')) {
-            $query->where('city', 'like', '%' . $request->city . '%');
-        }
+       
 
         // Search by name or description
         if ($request->has('search')) {
@@ -60,71 +57,78 @@ class StoreController extends Controller
         }
 
         // Filter by state against store or its branches
-        if ($request->has('state')) {
-            $state = $request->get('state');
-            
-            \Log::info('StoreController: Filtering by state', [
-                'requested_state' => $state,
-                'state_type' => gettype($state)
-            ]);
-            
-            // Debug: Check what stores exist with this state before filtering
-            $storesWithState = \App\Models\Store::all()->filter(function ($store) use ($state) {
-                return $store->state === $state; // state is decrypted by accessor
-            });
-            
-            \Log::info('StoreController: Stores with exact state match', [
-                'state' => $state,
-                'count' => $storesWithState->count(),
-                'stores' => $storesWithState->map(function($store) {
-                    return [
-                        'id' => $store->id,
-                        'name' => $store->store_name,
-                        'state' => $store->state,
-                        'is_approved' => $store->is_approved
-                    ];
-                })->toArray()
-            ]);
-            
-            // Debug: Check what branches exist with this wilaya_code
-            $branchesWithState = \App\Models\StoreBranch::where('wilaya_code', $state)->get();
-            \Log::info('StoreController: Branches with exact wilaya_code match', [
-                'wilaya_code' => $state,
-                'count' => $branchesWithState->count(),
-                'branches' => $branchesWithState->map(function($branch) {
-                    return [
-                        'id' => $branch->id,
-                        'store_id' => $branch->store_id,
-                        'wilaya_code' => $branch->wilaya_code,
-                        'is_active' => $branch->is_active
-                    ];
-                })->toArray()
-            ]);
-
-            $query->where(function ($q) use ($state) {
-                // Primary store state match (exact only)
-                $q->where(function ($stateQuery) use ($state) {
-                    $stateQuery->where('state', $state)
-                              ->orWhere('state', (string)$state)
-                              ->orWhere('state', (int)$state);
+if ($request->has('state')) {
+    $state = $request->get('state');
+    
+    \Log::info('StoreController: Filtering by state', [
+        'requested_state' => $state,
+        'state_type' => gettype($state)
+    ]);
+    
+    $query->where(function ($q) use ($state) {
+        // Primary store state match - handle decryption in application layer
+        $q->where(function ($stateQuery) use ($state) {
+            // Get all stores and filter in memory for decrypted state matching
+            $matchingStoreIds = \App\Models\Store::all()
+                ->filter(function ($store) use ($state) {
+                    return $store->state === $state || 
+                           $store->state === (string)$state || 
+                           $store->state === (int)$state;
                 })
-                  
-                  // OR stores that have active branches in this state
-                  ->orWhereExists(function ($sub) use ($state) {
-                      $sub->selectRaw('1')
-                          ->from('store_branches')
-                          ->whereColumn('store_branches.store_id', 'stores.id')
-                          ->where('store_branches.is_active', true)
-                          ->where(function ($branchQuery) use ($state) {
-                              $branchQuery->where('store_branches.wilaya_code', $state)
-                                         ->orWhere('store_branches.wilaya_code', (string)$state)
-                                         ->orWhere('store_branches.wilaya_code', (int)$state);
-                          });
-                  });
-            });
-        }
+                ->pluck('id')
+                ->toArray();
+            
+            $stateQuery->whereIn('stores.id', $matchingStoreIds);
+        })
+        
+        // OR stores that have active branches in this state
+        ->orWhereExists(function ($sub) use ($state) {
+            $sub->selectRaw('1')
+                ->from('store_branches')
+                ->whereColumn('store_branches.store_id', 'stores.id')
+                ->where('store_branches.is_active', true)
+                ->where(function ($branchQuery) use ($state) {
+                    $branchQuery->where('store_branches.wilaya_code', $state)
+                               ->orWhere('store_branches.wilaya_code', (string)$state)
+                               ->orWhere('store_branches.wilaya_code', (int)$state);
+                });
+        });
+    });
+}
 
+// Filter by location if provided
+if ($request->has('city')) {
+    $city = $request->get('city');
+    
+    // Get store IDs that have the decrypted city matching (partial match)
+    $matchingStoreIds = \App\Models\Store::all()
+        ->filter(function ($store) use ($city) {
+            return str_contains(strtolower($store->city), strtolower($city));
+        })
+        ->pluck('id')
+        ->toArray();
 
+    // Get store IDs that have branches with matching city (partial match)
+    $matchingBranchStoreIds = \App\Models\StoreBranch::all()
+        ->filter(function ($branch) use ($city) {
+            return str_contains(strtolower($branch->city), strtolower($city));
+        })
+        ->pluck('store_id')
+        ->toArray();
+
+    // Combine both sets of store IDs
+    $allMatchingStoreIds = array_unique(array_merge(
+        $matchingStoreIds,
+        $matchingBranchStoreIds
+    ));
+
+    if (!empty($allMatchingStoreIds)) {
+        $query->whereIn('stores.id', $allMatchingStoreIds);
+    } else {
+        // If no stores match, ensure no results are returned
+        $query->whereRaw('1 = 0');
+    }
+}
 
         $stores = $query->get();
         
