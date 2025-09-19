@@ -36,7 +36,7 @@ class NotificationController extends Controller
             $query->where('created_at', '<=', $request->end_date);
         }
 
-        $notifications = $query->orderBy('created_at', 'desc')->paginate(20);
+        $notifications = $query->orderBy('created_at', 'desc')->get();
 
         return response()->json([
             'message' => 'Notifications retrieved successfully',

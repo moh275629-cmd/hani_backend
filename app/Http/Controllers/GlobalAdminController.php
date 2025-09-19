@@ -57,7 +57,7 @@ class GlobalAdminController extends Controller
                 $query->where('is_active', $request->status === 'active');
             }
 
-            $admins = $query->paginate($request->get('per_page', 15));
+            $admins = $query->get();
 
             // Transform the data to handle encrypted fields
             $transformedData = $admins->getCollection()->map(function ($admin) {
@@ -422,7 +422,7 @@ class GlobalAdminController extends Controller
                 $query->where('is_active', $request->boolean('active'));
             }
 
-            $terms = $query->orderBy('created_at', 'desc')->paginate($request->get('per_page', 15));
+            $terms = $query->orderBy('created_at', 'desc')->get();
 
             return response()->json([
                 'message' => 'Terms and conditions retrieved successfully',
@@ -620,7 +620,7 @@ class GlobalAdminController extends Controller
                 $query->where('is_required', $request->boolean('required'));
             }
 
-            $documents = $query->orderBy('display_order')->paginate($request->get('per_page', 15));
+            $documents = $query->orderBy('display_order')->get();
 
             return response()->json([
                 'message' => 'Required documents retrieved successfully',

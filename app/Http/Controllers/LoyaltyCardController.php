@@ -117,7 +117,7 @@ class LoyaltyCardController extends Controller
         $transactions = Purchase::where('user_id', $user->id)
             ->with(['branch', 'offer'])
             ->orderBy('created_at', 'desc')
-            ->paginate(20);
+            ->get();
 
         return response()->json([
             'message' => 'Transactions retrieved successfully',

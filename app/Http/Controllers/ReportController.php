@@ -98,7 +98,7 @@ class ReportController extends Controller
             $query->where('created_at', '<=', $request->date_to);
         }
 
-        $reports = $query->orderBy('created_at', 'desc')->paginate(20);
+        $reports = $query->orderBy('created_at', 'desc')->get();
 
         return response()->json([
             'success' => true,
@@ -134,7 +134,7 @@ class ReportController extends Controller
             });
         }
 
-        $reports = $query->orderBy('created_at', 'desc')->paginate(20);
+        $reports = $query->orderBy('created_at', 'desc')->get();
 
         return response()->json([
             'success' => true,

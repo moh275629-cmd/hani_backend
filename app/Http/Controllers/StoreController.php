@@ -32,10 +32,9 @@ class StoreController extends Controller
         }
         
 
-      
-
-       
-
+        if ($request->has('state')) {
+            $query->where('state', 'like', '%' . $request->state . '%');
+        }
         if ($request->has('payment_methods')) {
             $query->where('payment_methods', 'like', '%' . $request->payment_methods . '%');
         }
@@ -46,7 +45,9 @@ class StoreController extends Controller
             $query->where('business_type', 'like', '%' . $request->business_type . '%');
         }
         // Filter by location if provided
-       
+        if ($request->has('city')) {
+            $query->where('city', 'like', '%' . $request->city . '%');
+        }
 
         // Search by name or description
         if ($request->has('search')) {
@@ -55,8 +56,8 @@ class StoreController extends Controller
         }
 
         // Filter by wilaya_code against store or its branches
-        if ($request->has('state')) {
-            $wilayaCode = $request->get('state');
+        if ($request->has('wilaya_code')) {
+            $wilayaCode = $request->get('wilaya_code');
 
             $query->where(function ($q) use ($wilayaCode) {
                 $q->where('state', $wilayaCode)
@@ -66,20 +67,6 @@ class StoreController extends Controller
                           ->whereColumn('store_branches.store_id', 'stores.id')
                           ->where('store_branches.is_active', true)
                           ->where('store_branches.wilaya_code', $wilayaCode);
-                  });
-            });
-        }
-        if ($request->has('city')) {
-            $filterCity = $request->get('city');
-
-            $query->where(function ($q) use ($filterCity) {
-                $q->where('city', $filterCity)
-                  ->orWhereExists(function ($sub) use ($filterCity) {
-                      $sub->selectRaw('1')
-                          ->from('store_branches')
-                          ->whereColumn('store_branches.store_id', 'stores.id')
-                          ->where('store_branches.is_active', true)
-                          ->where('store_branches.city', $filterCity);
                   });
             });
         }
@@ -382,22 +369,16 @@ class StoreController extends Controller
             $query->where('rating', '>=', $request->min_rating);
         }
 
-        // Location filters
-        if ($request->has('city')) {
-            $query->where('city', 'like', '%' . $request->city . '%');
-        }
-
+      
         if ($request->has('state')) {
-            $query->where('state', 'like', '%' . $request->state . '%');
-        }
-
-        // Filter by wilaya_code against store or its branches
-        if ($request->has('wilaya_code')) {
-            $wilayaCode = $request->get('wilaya_code');
-
-            // Match stores whose primary wilaya matches OR have at least one active branch in this wilaya
+            $wilayaCode = $request->get('state');
+        
             $query->where(function ($q) use ($wilayaCode) {
+                // Primary store state match (exact or LIKE)
                 $q->where('state', $wilayaCode)
+                  ->orWhere('state', 'like', '%' . $wilayaCode . '%')
+        
+                  // Branches in this wilaya
                   ->orWhereExists(function ($sub) use ($wilayaCode) {
                       $sub->selectRaw('1')
                           ->from('store_branches')
@@ -406,8 +387,8 @@ class StoreController extends Controller
                           ->where('store_branches.wilaya_code', $wilayaCode);
                   });
             });
-
-            // Also include offers scoped to branches in this wilaya
+        
+            // Also eager load offers filtered by branch wilaya
             $query->with(['offers' => function ($offerQ) use ($wilayaCode) {
                 $offerQ->where('is_active', true)
                        ->where('valid_from', '<=', now())
@@ -418,6 +399,42 @@ class StoreController extends Controller
             }]);
         }
 
+        // Location filters
+if ($request->has('city')) {
+    $city = $request->get('city');
+
+    $query->where(function ($q) use ($city) {
+        // Store city match (exact or partial)
+        $q->where('city', $city)
+          ->orWhere('city', 'like', '%' . $city . '%')
+
+          // Or check active branches in that city
+          ->orWhereExists(function ($sub) use ($city) {
+              $sub->selectRaw('1')
+                  ->from('store_branches')
+                  ->whereColumn('store_branches.store_id', 'stores.id')
+                  ->where('store_branches.is_active', true)
+                  ->where(function ($b) use ($city) {
+                      $b->where('city', $city)
+                        ->orWhere('city', 'like', '%' . $city . '%');
+                  });
+          });
+    });
+
+    // Optionally eager load offers scoped to branch city
+    $query->with(['offers' => function ($offerQ) use ($city) {
+        $offerQ->where('is_active', true)
+               ->where('valid_from', '<=', now())
+               ->where('valid_until', '>=', now())
+               ->whereHas('branches', function ($b) use ($city) {
+                   $b->where('city', $city)
+                     ->orWhere('city', 'like', '%' . $city . '%');
+               });
+    }]);
+}
+
+        
+
         // Sort options
         $sortBy = $request->get('sort_by', 'name');
         $sortOrder = $request->get('sort_order', 'asc');
@@ -427,7 +444,7 @@ class StoreController extends Controller
             $query->orderBy($sortBy, $sortOrder);
         }
 
-        $stores = $query->paginate($request->get('per_page', 20));
+        $stores = $query->get();
 
         return response()->json([
             'message' => 'Store search completed successfully',
@@ -538,7 +555,7 @@ class StoreController extends Controller
         
         $offers = Offer::where('store_id', $store->id)
             ->orderBy('created_at', 'desc')
-            ->paginate(20);
+            ->get();
         return response()->json([
             'message' => 'Store offers retrieved successfully',
             'data' => $offers

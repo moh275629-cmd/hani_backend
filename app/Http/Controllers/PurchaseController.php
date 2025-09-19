@@ -42,7 +42,7 @@ class PurchaseController extends Controller
             $query->where('store_id', $request->store_id);
         }
 
-        $purchases = $query->orderBy('purchase_date', 'desc')->paginate(20);
+        $purchases = $query->orderBy('purchase_date', 'desc')->get();
 
         // Ensure blob fields are not included in the response
         $purchases->getCollection()->transform(function ($purchase) {

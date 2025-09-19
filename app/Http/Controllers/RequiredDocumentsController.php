@@ -33,7 +33,7 @@ class RequiredDocumentsController extends Controller
                 $query->where('is_active', $request->boolean('is_active'));
             }
 
-            $documents = $query->ordered()->paginate($request->get('per_page', 15));
+            $documents = $query->ordered()->get();
 
             return response()->json([
                 'message' => 'Required documents retrieved successfully',

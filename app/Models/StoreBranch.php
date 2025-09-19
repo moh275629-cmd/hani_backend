@@ -12,7 +12,6 @@ class StoreBranch extends Model
     protected $fillable = [
         'store_id',
         'wilaya_code',
-        
         'city',
         'address',
         'phone',

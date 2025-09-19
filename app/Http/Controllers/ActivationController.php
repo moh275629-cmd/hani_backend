@@ -43,7 +43,7 @@ class ActivationController extends Controller
             });
         }
 
-        $expiredAccounts = $query->orderBy('deactivate_at', 'desc')->paginate(20);
+        $expiredAccounts = $query->orderBy('deactivate_at', 'desc')->get();
 
         return response()->json([
             'success' => true,
@@ -76,7 +76,7 @@ class ActivationController extends Controller
             });
         }
 
-        $expiringAccounts = $query->orderBy('deactivate_at', 'asc')->paginate(20);
+        $expiringAccounts = $query->orderBy('deactivate_at', 'asc')->get();
 
         return response()->json([
             'success' => true,
