@@ -36,45 +36,47 @@ class BusinessTypeController extends Controller
      * Get business types for dropdown (admin use)
      */
     public function getForDropdown(): JsonResponse
-{
-    try {
-        $businessTypes = BusinessType::getActiveTypes();
-
-        $dropdown = $businessTypes->map(function ($type) {
-            return [
-                'value' => $type->key,
-                'label' => $type->name,
-                'is_system_defined' => $type->is_system_defined,
-                'usage_count' => $type->usage_count,
-            ];
-        });
-
-        // Step 1: sort alphabetically
-        $dropdown = $dropdown->sortBy(function ($item) {
-            return strtolower($item['label']);
-        })->values();
-
-        // Step 2: move "Other" to the end
-        $other = $dropdown->firstWhere('label', 'Other');
-        if ($other) {
-            $dropdown = $dropdown->reject(fn($item) => $item['label'] === 'Other')
-                                 ->push($other)
-                                 ->values();
+    {
+        try {
+            $businessTypes = BusinessType::getActiveTypes();
+    
+            $dropdown = $businessTypes->map(function ($type) {
+                return [
+                    'value' => $type->key,
+                    'label' => $type->name,
+                    'is_system_defined' => $type->is_system_defined,
+                    'usage_count' => $type->usage_count,
+                ];
+            });
+    
+            // Separate "Other" from the rest
+            $otherItem = $dropdown->firstWhere('label', 'Other');
+            $regularItems = $dropdown->reject(fn($item) => $item['label'] === 'Other');
+    
+            // Sort regular items alphabetically
+            $sortedRegularItems = $regularItems->sortBy(function ($item) {
+                return strtolower($item['label']);
+            })->values();
+    
+            // Combine sorted items with "Other" at the end
+            $finalDropdown = $sortedRegularItems;
+            if ($otherItem) {
+                $finalDropdown = $finalDropdown->push($otherItem)->values();
+            }
+    
+            return response()->json([
+                'success' => true,
+                'message' => 'Business types retrieved successfully',
+                'data' => $finalDropdown,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error fetching business types for dropdown',
+                'error' => $e->getMessage()
+            ], 500);
         }
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Business types retrieved successfully',
-            'data' => $dropdown,
-        ]);
-    } catch (\Exception $e) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Error fetching business types for dropdown',
-            'error' => $e->getMessage()
-        ], 500);
     }
-}
 
     
     /**
