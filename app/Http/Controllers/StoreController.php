@@ -32,9 +32,10 @@ class StoreController extends Controller
         }
         
 
-        if ($request->has('state')) {
-            $query->where('state', 'like', '%' . $request->state . '%');
-        }
+      
+
+       
+
         if ($request->has('payment_methods')) {
             $query->where('payment_methods', 'like', '%' . $request->payment_methods . '%');
         }
@@ -45,9 +46,7 @@ class StoreController extends Controller
             $query->where('business_type', 'like', '%' . $request->business_type . '%');
         }
         // Filter by location if provided
-        if ($request->has('city')) {
-            $query->where('city', 'like', '%' . $request->city . '%');
-        }
+       
 
         // Search by name or description
         if ($request->has('search')) {
@@ -56,8 +55,8 @@ class StoreController extends Controller
         }
 
         // Filter by wilaya_code against store or its branches
-        if ($request->has('wilaya_code')) {
-            $wilayaCode = $request->get('wilaya_code');
+        if ($request->has('state')) {
+            $wilayaCode = $request->get('state');
 
             $query->where(function ($q) use ($wilayaCode) {
                 $q->where('state', $wilayaCode)
@@ -67,6 +66,20 @@ class StoreController extends Controller
                           ->whereColumn('store_branches.store_id', 'stores.id')
                           ->where('store_branches.is_active', true)
                           ->where('store_branches.wilaya_code', $wilayaCode);
+                  });
+            });
+        }
+        if ($request->has('city')) {
+            $filterCity = $request->get('city');
+
+            $query->where(function ($q) use ($filterCity) {
+                $q->where('city', $filterCity)
+                  ->orWhereExists(function ($sub) use ($filterCity) {
+                      $sub->selectRaw('1')
+                          ->from('store_branches')
+                          ->whereColumn('store_branches.store_id', 'stores.id')
+                          ->where('store_branches.is_active', true)
+                          ->where('store_branches.city', $filterCity);
                   });
             });
         }
