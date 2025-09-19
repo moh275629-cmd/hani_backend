@@ -51,13 +51,20 @@ class BusinessTypeController extends Controller
     
             // Sort alphabetically, but keep "Other" last
             $dropdown = $dropdown->sort(function ($a, $b) {
-                // If one of them is "Other", push it last
-                if (strtolower($a['label']) === 'other') return 1;
-                if (strtolower($b['label']) === 'other') return -1;
+                $aLabel = strtolower($a['label']);
+                $bLabel = strtolower($b['label']);
+    
+                // Special case: push "other" last
+                if ($aLabel === 'other' && $bLabel !== 'other') {
+                    return 1;
+                }
+                if ($bLabel === 'other' && $aLabel !== 'other') {
+                    return -1;
+                }
     
                 // Otherwise sort alphabetically
                 return strcasecmp($a['label'], $b['label']);
-            })->values(); // reset keys
+            })->values(); // reset array keys
     
             return response()->json([
                 'success' => true,
