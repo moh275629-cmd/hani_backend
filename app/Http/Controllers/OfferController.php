@@ -52,14 +52,15 @@ class OfferController extends Controller
         })
         
         // OR offers from stores that have active branches in this state
-        ->orWhereHas('offer.branches', function ($branchQuery) use ($state) {
+        ->orWhereHas('store.branches', function ($branchQuery) use ($state) {
             $branchQuery->where('is_active', true)
-                       ->where(function ($branchStateQuery) use ($state) {
-                           $branchStateQuery->where('wilaya_code', $state)
-                                           ->orWhere('wilaya_code', (string)$state)
-                                           ->orWhere('wilaya_code', (int)$state);
-                       });
+                        ->where(function ($branchStateQuery) use ($state) {
+                            $branchStateQuery->where('wilaya_code', $state)
+                                             ->orWhere('wilaya_code', (string)$state)
+                                             ->orWhere('wilaya_code', (int)$state);
+                        });
         });
+        
     });
 }
 

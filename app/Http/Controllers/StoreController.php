@@ -67,7 +67,39 @@ class StoreController extends Controller
                 'requested_state' => $state,
                 'state_type' => gettype($state)
             ]);
-            $query->where('state', 'like', '%' . $request->state . '%');
+            
+            // Debug: Check what stores exist with this state before filtering
+            $storesWithState = \App\Models\Store::all()->filter(function ($store) use ($state) {
+                return $store->state === $state; // state is decrypted by accessor
+            });
+            
+            \Log::info('StoreController: Stores with exact state match', [
+                'state' => $state,
+                'count' => $storesWithState->count(),
+                'stores' => $storesWithState->map(function($store) {
+                    return [
+                        'id' => $store->id,
+                        'name' => $store->store_name,
+                        'state' => $store->state,
+                        'is_approved' => $store->is_approved
+                    ];
+                })->toArray()
+            ]);
+            
+            // Debug: Check what branches exist with this wilaya_code
+            $branchesWithState = \App\Models\StoreBranch::where('wilaya_code', $state)->get();
+            \Log::info('StoreController: Branches with exact wilaya_code match', [
+                'wilaya_code' => $state,
+                'count' => $branchesWithState->count(),
+                'branches' => $branchesWithState->map(function($branch) {
+                    return [
+                        'id' => $branch->id,
+                        'store_id' => $branch->store_id,
+                        'wilaya_code' => $branch->wilaya_code,
+                        'is_active' => $branch->is_active
+                    ];
+                })->toArray()
+            ]);
 
             $query->where(function ($q) use ($state) {
                 // Primary store state match (exact only)
@@ -97,10 +129,18 @@ class StoreController extends Controller
         $stores = $query->get();
         
         // Debug: Log the SQL query and results
-        \Log::info('StoreController: Query executed', [
+        \Log::info('StoreController: Final query executed', [
             'sql' => $query->toSql(),
             'bindings' => $query->getBindings(),
-            'stores_count' => $stores->count()
+            'stores_count' => $stores->count(),
+            'final_stores' => $stores->map(function($store) {
+                return [
+                    'id' => $store->id,
+                    'name' => $store->store_name,
+                    'state' => $store->state,
+                    'is_approved' => $store->is_approved
+                ];
+            })->toArray()
         ]);
         
         // Debug: Log sample store data to check state field types
