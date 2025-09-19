@@ -67,6 +67,7 @@ class StoreController extends Controller
                 'requested_state' => $state,
                 'state_type' => gettype($state)
             ]);
+            $query->where('state', 'like', '%' . $request->state . '%');
 
             $query->where(function ($q) use ($state) {
                 // Primary store state match (exact only)
