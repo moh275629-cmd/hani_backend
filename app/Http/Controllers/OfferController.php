@@ -58,7 +58,7 @@ class OfferController extends Controller
                 })
                 
                 // OR offers from stores that have active branches in this state
-                ->orWhereHas('store.branches', function ($branchQuery) use ($state) {
+                ->orWhereHas('branches', function ($branchQuery) use ($state) {
                     $branchQuery->where('is_active', true)
                                 ->where(function ($branchStateQuery) use ($state) {
                                     $branchStateQuery->where('wilaya_code', $state)
