@@ -101,15 +101,29 @@ class BranchEditRequestController extends Controller
         $user = Auth::user();
         $admin = $user->admin;
         
-        if (!$admin || !$admin->wilaya_code) {
-            return response()->json(['message' => 'Admin wilaya not found'], 404);
+        if (!$admin) {
+            return response()->json(['message' => 'Admin not found'], 404);
         }
 
-        $requests = BranchEditRequest::where('wilaya_code', $admin->wilaya_code)
-            ->where('status', 'pending')
-            ->with(['store', 'branch'])
-            ->orderBy('requested_at', 'desc')
-            ->get();
+        $query = BranchEditRequest::where('status', 'pending')
+            ->with(['store', 'branch']);
+
+        // If user is global admin, they can see all requests with optional wilaya filter
+        if ($user->isGlobalAdmin()) {
+            // Check if wilaya filter is provided in request
+            if ($request->has('wilaya_code') && $request->wilaya_code) {
+                $query->where('wilaya_code', $request->wilaya_code);
+            }
+            // If no wilaya filter, show all requests
+        } else {
+            // Regular wilaya admin - only see requests for their wilaya
+            if (!$admin->wilaya_code) {
+                return response()->json(['message' => 'Admin wilaya not found'], 404);
+            }
+            $query->where('wilaya_code', $admin->wilaya_code);
+        }
+
+        $requests = $query->orderBy('requested_at', 'desc')->get();
 
         return response()->json([
             'data' => $requests
@@ -122,8 +136,8 @@ class BranchEditRequestController extends Controller
         $user = Auth::user();
         $admin = $user->admin;
         
-        if (!$admin || !$admin->wilaya_code) {
-            return response()->json(['message' => 'Admin wilaya not found'], 404);
+        if (!$admin) {
+            return response()->json(['message' => 'Admin not found'], 404);
         }
 
         $validator = Validator::make($request->all(), [
@@ -140,8 +154,21 @@ class BranchEditRequestController extends Controller
 
         $editRequest = BranchEditRequest::find($requestId);
         
-        if (!$editRequest || $editRequest->wilaya_code !== $admin->wilaya_code) {
-            return response()->json(['message' => 'Request not found or unauthorized'], 404);
+        if (!$editRequest) {
+            return response()->json(['message' => 'Request not found'], 404);
+        }
+
+        // Check authorization based on admin type
+        if ($user->isGlobalAdmin()) {
+            // Global admin can process any request
+        } else {
+            // Regular wilaya admin can only process requests for their wilaya
+            if (!$admin->wilaya_code) {
+                return response()->json(['message' => 'Admin wilaya not found'], 404);
+            }
+            if ($editRequest->wilaya_code !== $admin->wilaya_code) {
+                return response()->json(['message' => 'Request not authorized for this admin'], 403);
+            }
         }
 
         if ($editRequest->status !== 'pending') {
