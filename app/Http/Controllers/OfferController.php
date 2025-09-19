@@ -94,7 +94,7 @@ class OfferController extends Controller
                 })
                 
                 // OR offers from stores that have active branches in this city
-                ->orWhereHas('store.branches', function ($branchQuery) use ($city) {
+                ->orWhereHas('branches', function ($branchQuery) use ($city) {
                     // For branches, we also need to handle decryption if city is encrypted there too
                     $matchingBranchStoreIds = \App\Models\StoreBranch::all()
                         ->filter(function ($branch) use ($city) {
