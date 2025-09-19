@@ -42,10 +42,9 @@ class OfferController extends Controller
     $state = $request->get('state');
 
     $query->where(function ($q) use ($state) {
-        // Offers from stores whose primary state matches
+        // Offers from stores whose primary state matches (exact only)
         $q->whereHas('store', function ($storeQuery) use ($state) {
-            $storeQuery->where('state', $state)
-                      ->orWhere('state', 'like', '%' . $state . '%');
+            $storeQuery->where('state', $state);
         })
         
         // OR offers from stores that have active branches in this state
@@ -62,16 +61,14 @@ if ($request->has('city')) {
     \Log::info('Filtering offers by city', ['requested_city' => $city]);
     
     $query->where(function ($q) use ($city) {
-        // Offers from stores whose primary city matches
+        // Offers from stores whose primary city matches (exact only)
         $q->whereHas('store', function ($storeQuery) use ($city) {
-            $storeQuery->where('city', $city)
-                      ->orWhere('city', 'like', '%' . $city . '%');
+            $storeQuery->where('city', $city);
         })
         
-        // OR offers from stores that have active branches in this city
+        // OR offers from stores that have active branches in this city (exact only)
         ->orWhereHas('store.branches', function ($branchQuery) use ($city) {
             $branchQuery->where('city', $city)
-                       ->orWhere('city', 'like', '%' . $city . '%')
                        ->where('is_active', true);
         });
     });

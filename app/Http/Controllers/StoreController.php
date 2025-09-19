@@ -57,9 +57,8 @@ class StoreController extends Controller
             $state = $request->get('state');
 
             $query->where(function ($q) use ($state) {
-                // Primary store state match (exact or LIKE)
+                // Primary store state match (exact only)
                 $q->where('state', $state)
-                  ->orWhere('state', 'like', '%' . $state . '%')
                   
                   // OR stores that have active branches in this state
                   ->orWhereExists(function ($sub) use ($state) {
