@@ -104,6 +104,11 @@ class Store extends Model
         return $this->hasMany(Offer::class);
     }
 
+    public function branches()
+    {
+        return $this->hasMany(StoreBranch::class);
+    }
+
     public function loyaltyCards()
     {
         return $this->hasMany(LoyaltyCard::class);

@@ -109,18 +109,38 @@ class StoreController extends Controller
             ]);
         } else {
             // If no stores found, let's check what stores exist without filtering
-            $allStores = \App\Models\Store::select('id', 'store_name', 'state')->get();
+            $allStores = \App\Models\Store::select('id', 'store_name', 'state', 'is_approved')->get();
             \Log::info('StoreController: No filtered stores found, checking all stores', [
                 'total_stores' => $allStores->count(),
-                'sample_stores' => $allStores->take(5)->map(function($store) {
+                'approved_stores' => $allStores->where('is_approved', true)->count(),
+                'sample_stores' => $allStores->take(10)->map(function($store) {
                     return [
                         'id' => $store->id,
                         'name' => $store->store_name,
                         'state' => $store->state,
-                        'state_type' => gettype($store->state)
+                        'state_type' => gettype($store->state),
+                        'is_approved' => $store->is_approved
                     ];
                 })->toArray()
             ]);
+            
+            // Also check if there are any stores with the specific state we're looking for
+            if ($request->has('state')) {
+                $state = $request->get('state');
+                $storesWithState = \App\Models\Store::where('state', $state)->get();
+                \Log::info('StoreController: Stores with specific state', [
+                    'requested_state' => $state,
+                    'stores_with_state' => $storesWithState->count(),
+                    'stores_data' => $storesWithState->map(function($store) {
+                        return [
+                            'id' => $store->id,
+                            'name' => $store->store_name,
+                            'state' => $store->state,
+                            'is_approved' => $store->is_approved
+                        ];
+                    })->toArray()
+                ]);
+            }
         }
 
         return response()->json([
