@@ -36,48 +36,46 @@ class BusinessTypeController extends Controller
      * Get business types for dropdown (admin use)
      */
     public function getForDropdown(): JsonResponse
-    {
-        try {
-            $businessTypes = BusinessType::getActiveTypes();
-    
-            $dropdown = $businessTypes->map(function ($type) {
-                return [
-                    'value' => $type->key,
-                    'label' => $type->name,
-                    'is_system_defined' => $type->is_system_defined,
-                    'usage_count' => $type->usage_count,
-                ];
-            });
-    
-            // Sort alphabetically, but keep "Other" last
-            $dropdown = $dropdown->sort(function ($a, $b) {
-                $aLabel = strtolower($a['label']);
-                $bLabel = strtolower($b['label']);
-    
-                // Special case: push "other" last
-                if ($aLabel === 'other' && $bLabel !== 'other') {
-                    return 1;
-                }
-                if ($bLabel === 'other' && $aLabel !== 'other') {
-                    return -1;
-                }
-    
-                // Otherwise sort alphabetically
-                return strcasecmp($a['label'], $b['label']);
-            })->values(); // reset array keys
-    
-            return response()->json([
-                'success' => true,
-                'data' => $dropdown,
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Error fetching business types for dropdown',
-                'error' => $e->getMessage()
-            ], 500);
+{
+    try {
+        $businessTypes = BusinessType::getActiveTypes();
+
+        $dropdown = $businessTypes->map(function ($type) {
+            return [
+                'value' => $type->key,
+                'label' => $type->name,
+                'is_system_defined' => $type->is_system_defined,
+                'usage_count' => $type->usage_count,
+            ];
+        });
+
+        // Step 1: sort alphabetically
+        $dropdown = $dropdown->sortBy(function ($item) {
+            return strtolower($item['label']);
+        })->values();
+
+        // Step 2: move "Other" to the end
+        $other = $dropdown->firstWhere('label', 'Other');
+        if ($other) {
+            $dropdown = $dropdown->reject(fn($item) => $item['label'] === 'Other')
+                                 ->push($other)
+                                 ->values();
         }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Business types retrieved successfully',
+            'data' => $dropdown,
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Error fetching business types for dropdown',
+            'error' => $e->getMessage()
+        ], 500);
     }
+}
+
     
     /**
      * Create a new business type (admin only)
