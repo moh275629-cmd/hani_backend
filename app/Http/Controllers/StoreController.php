@@ -696,6 +696,7 @@ if ($request->has('city')) {
                 'discount_type' => 'required|in:percentage,fixed',
                 'discount_value' => 'required|numeric|min:0',
                 'minimum_purchase' => 'nullable|numeric|min:0',
+                'terms' => 'nullable|string',
                 'valid_from' => 'required|date',
                 'valid_until' => 'required|date|after:valid_from',
                 'is_active' => 'boolean'
