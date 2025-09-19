@@ -697,6 +697,7 @@ if ($request->has('city')) {
                 'discount_value' => 'required|numeric|min:0',
                 'minimum_purchase' => 'nullable|numeric|min:0',
                 'terms' => 'nullable|string',
+                'old_price' => 'nullable|numeric|min:0',
                 'valid_from' => 'required|date',
                 'valid_until' => 'required|date|after:valid_from',
                 'is_active' => 'boolean'
@@ -740,6 +741,11 @@ if ($request->has('city')) {
                 $data['terms'] = json_encode([]);
             } else {
                 $data['terms'] = json_encode([$data['terms']]);
+            }
+            if (!isset($data['old_price'])) {
+                $data['old_price'] = 0;
+            } else {
+                $data['old_price'] = json_encode([$data['old_price']]);
             }
 
             \Log::info('Final offer data: ' . json_encode($data));
@@ -817,7 +823,10 @@ if ($request->has('city')) {
             'minimum_purchase' => 'sometimes|numeric|min:0',
             'valid_from' => 'sometimes|date',
             'valid_until' => 'sometimes|date|after:valid_from',
-            'is_active' => 'sometimes|boolean'
+            'is_active' => 'sometimes|boolean',
+            'old_price' => 'sometimes|numeric|min:0',
+            'terms' => 'sometimes|string',
+
         ]);
 
         if ($validator->fails()) {
@@ -860,6 +869,12 @@ if ($request->has('city')) {
         }
         if ($request->has('is_active')) {
             $offer->is_active = $request->is_active;
+        }
+        if ($request->has('old_price')) {
+            $offer->old_price = $request->old_price;
+        }
+        if ($request->has('terms')) {
+            $offer->terms = $request->terms;
         }
         
         $offer->save();
