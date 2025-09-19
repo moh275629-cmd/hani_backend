@@ -17,6 +17,7 @@ return new class extends Migration
             $table->enum('action', ['create', 'update', 'delete']);
             $table->foreignId('branch_id')->nullable()->constrained('store_branches')->onDelete('cascade');
             $table->json('branch_data')->nullable();
+            $table->string('wilaya_code')->nullable();
             $table->enum('status', ['pending', 'approved', 'rejected'])->default('pending');
             $table->timestamp('requested_at');
             $table->timestamp('processed_at')->nullable();

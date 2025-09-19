@@ -220,6 +220,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/stores/me/branch-edit-requests', [\App\Http\Controllers\BranchEditRequestController::class, 'store']);
     Route::get('/stores/me/branch-edit-requests', [\App\Http\Controllers\BranchEditRequestController::class, 'index']);
     
+    // Wilaya admin routes for branch requests
+    Route::get('/admin/branch-requests', [\App\Http\Controllers\BranchEditRequestController::class, 'getWilayaRequests']);
+    Route::put('/admin/branch-requests/{requestId}', [\App\Http\Controllers\BranchEditRequestController::class, 'processRequest']);
+    
     // Store Edit Requests
     Route::post('/store/edit-request', [App\Http\Controllers\EditStoreController::class, 'submit']);
     Route::get('/store/edit-requests', [App\Http\Controllers\EditStoreController::class, 'myRequests']);

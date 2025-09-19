@@ -12,8 +12,10 @@ class BranchEditRequest extends Model
     protected $fillable = [
         'store_id',
         'action',
+        
         'branch_id',
         'branch_data',
+        'wilaya_code',
         'status',
         'requested_at',
         'processed_at',
@@ -40,5 +42,10 @@ class BranchEditRequest extends Model
     public function processedBy()
     {
         return $this->belongsTo(User::class, 'processed_by');
+    }
+
+    public function wilaya()
+    {
+        return $this->belongsTo(Wilaya::class, 'wilaya_code', 'code');
     }
 }
