@@ -39,7 +39,7 @@ class BusinessTypeController extends Controller
     {
         try {
             $businessTypes = BusinessType::getActiveTypes();
-            
+    
             $dropdown = $businessTypes->map(function ($type) {
                 return [
                     'value' => $type->key,
@@ -48,7 +48,17 @@ class BusinessTypeController extends Controller
                     'usage_count' => $type->usage_count,
                 ];
             });
-            
+    
+            // Sort alphabetically, but keep "Other" last
+            $dropdown = $dropdown->sort(function ($a, $b) {
+                // If one of them is "Other", push it last
+                if (strtolower($a['label']) === 'other') return 1;
+                if (strtolower($b['label']) === 'other') return -1;
+    
+                // Otherwise sort alphabetically
+                return strcasecmp($a['label'], $b['label']);
+            })->values(); // reset keys
+    
             return response()->json([
                 'success' => true,
                 'data' => $dropdown,
@@ -61,7 +71,7 @@ class BusinessTypeController extends Controller
             ], 500);
         }
     }
-
+    
     /**
      * Create a new business type (admin only)
      */
