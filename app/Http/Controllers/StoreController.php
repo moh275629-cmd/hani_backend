@@ -32,9 +32,6 @@ class StoreController extends Controller
         }
         
 
-        if ($request->has('state')) {
-            $query->where('state', 'like', '%' . $request->state . '%');
-        }
         if ($request->has('payment_methods')) {
             $query->where('payment_methods', 'like', '%' . $request->payment_methods . '%');
         }
@@ -55,18 +52,22 @@ class StoreController extends Controller
             $query->searchByEncryptedFields($search);
         }
 
-        // Filter by wilaya_code against store or its branches
-        if ($request->has('wilaya_code')) {
-            $wilayaCode = $request->get('wilaya_code');
+        // Filter by state against store or its branches
+        if ($request->has('state')) {
+            $state = $request->get('state');
 
-            $query->where(function ($q) use ($wilayaCode) {
-                $q->where('state', $wilayaCode)
-                  ->orWhereExists(function ($sub) use ($wilayaCode) {
+            $query->where(function ($q) use ($state) {
+                // Primary store state match (exact or LIKE)
+                $q->where('state', $state)
+                  ->orWhere('state', 'like', '%' . $state . '%')
+                  
+                  // OR stores that have active branches in this state
+                  ->orWhereExists(function ($sub) use ($state) {
                       $sub->selectRaw('1')
                           ->from('store_branches')
                           ->whereColumn('store_branches.store_id', 'stores.id')
                           ->where('store_branches.is_active', true)
-                          ->where('store_branches.wilaya_code', $wilayaCode);
+                          ->where('store_branches.wilaya_code', $state);
                   });
             });
         }
