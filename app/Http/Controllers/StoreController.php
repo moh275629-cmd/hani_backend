@@ -69,10 +69,12 @@ class StoreController extends Controller
             ]);
 
             $query->where(function ($q) use ($state) {
-                // Primary store state match (exact only) - handle both string and integer
-                $q->where('state', $state)
-                  ->orWhere('state', (string)$state)
-                  ->orWhere('state', (int)$state)
+                // Primary store state match (exact only)
+                $q->where(function ($stateQuery) use ($state) {
+                    $stateQuery->where('state', $state)
+                              ->orWhere('state', (string)$state)
+                              ->orWhere('state', (int)$state);
+                })
                   
                   // OR stores that have active branches in this state
                   ->orWhereExists(function ($sub) use ($state) {
@@ -80,9 +82,11 @@ class StoreController extends Controller
                           ->from('store_branches')
                           ->whereColumn('store_branches.store_id', 'stores.id')
                           ->where('store_branches.is_active', true)
-                          ->where('store_branches.wilaya_code', $state)
-                          ->orWhere('store_branches.wilaya_code', (string)$state)
-                          ->orWhere('store_branches.wilaya_code', (int)$state);
+                          ->where(function ($branchQuery) use ($state) {
+                              $branchQuery->where('store_branches.wilaya_code', $state)
+                                         ->orWhere('store_branches.wilaya_code', (string)$state)
+                                         ->orWhere('store_branches.wilaya_code', (int)$state);
+                          });
                   });
             });
         }

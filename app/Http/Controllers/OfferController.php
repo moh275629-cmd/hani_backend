@@ -44,13 +44,21 @@ class OfferController extends Controller
     $query->where(function ($q) use ($state) {
         // Offers from stores whose primary state matches (exact only)
         $q->whereHas('store', function ($storeQuery) use ($state) {
-            $storeQuery->where('state', $state);
+            $storeQuery->where(function ($stateQuery) use ($state) {
+                $stateQuery->where('state', $state)
+                          ->orWhere('state', (string)$state)
+                          ->orWhere('state', (int)$state);
+            });
         })
         
         // OR offers from stores that have active branches in this state
         ->orWhereHas('store.branches', function ($branchQuery) use ($state) {
-            $branchQuery->where('wilaya_code', $state)
-                       ->where('is_active', true);
+            $branchQuery->where('is_active', true)
+                       ->where(function ($branchStateQuery) use ($state) {
+                           $branchStateQuery->where('wilaya_code', $state)
+                                           ->orWhere('wilaya_code', (string)$state)
+                                           ->orWhere('wilaya_code', (int)$state);
+                       });
         });
     });
 }
