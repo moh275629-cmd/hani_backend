@@ -88,14 +88,19 @@ if ($request->has('city')) {
         
         // Debug: Log the offers being returned
         \Log::info('Offers retrieved', [
-            'total_offers' => $offers->total(),
-            'current_page' => $offers->currentPage(),
-            'per_page' => $offers->perPage(),
-            'offers' => $offers->items()
+            'total_offers' => $offers->count(),
+            'offers_sample' => $offers->take(3)->map(function($offer) {
+                return [
+                    'id' => $offer->id,
+                    'title' => $offer->title,
+                    'store_id' => $offer->store_id,
+                    'store_state' => $offer->store->state ?? 'N/A'
+                ];
+            })->toArray()
         ]);
 
         // Add image URLs to offers and clean data
-        $offers->getCollection()->transform(function ($offer) {
+        $offers->transform(function ($offer) {
             try {
                 // Ensure blob fields are not included in the response
                 $offer->makeHidden(['image_blob']);
