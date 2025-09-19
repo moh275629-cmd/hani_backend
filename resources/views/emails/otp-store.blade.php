@@ -46,40 +46,6 @@
             letter-spacing: 5px;
             margin: 15px 0;
         }
-        .documents-section {
-            background-color: #fff3cd;
-            border: 1px solid #ffeaa7;
-            border-radius: 8px;
-            padding: 20px;
-            margin: 20px 0;
-        }
-        .documents-title {
-            color: #856404;
-            font-weight: bold;
-            margin-bottom: 15px;
-            font-size: 18px;
-        }
-        .document-item {
-            background-color: #ffffff;
-            border: 1px solid #ffeaa7;
-            border-radius: 5px;
-            padding: 15px;
-            margin: 10px 0;
-        }
-        .document-name {
-            font-weight: bold;
-            color: #333;
-            margin-bottom: 5px;
-        }
-        .document-description {
-            color: #666;
-            font-size: 14px;
-            margin-bottom: 8px;
-        }
-        .document-details {
-            font-size: 12px;
-            color: #888;
-        }
         .footer {
             text-align: center;
             margin-top: 30px;
@@ -115,29 +81,7 @@
             <p><small>This code will expire in 10 minutes</small></p>
         </div>
 
-        <div class="documents-section">
-            <div class="documents-title">📋 Required Documents for Store Registration</div>
-            <p>Please prepare the following documents to complete your store verification:</p>
-            
-            @foreach($requiredDocuments as $document)
-            <div class="document-item">
-                <div class="document-name">{{ $document->getDocumentName('en') }}</div>
-                <div class="document-description">{{ $document->getDescription('en') }}</div>
-                <div class="document-details">
-                    <strong>File Types:</strong> {{ $document->getFileTypesText() }} | 
-                    <strong>Max Size:</strong> {{ $document->getMaxFileSizeText() }} | 
-                    <strong>Required:</strong> {{ $document->isRequired() ? 'Yes' : 'No' }}
-                </div>
-            </div>
-            @endforeach
-        </div>
-
-        <div class="warning">
-            <strong>⚠️ Important:</strong> Please ensure all required documents are properly scanned or photographed in clear, readable format. 
-            Incomplete or unclear documents may delay your store approval process.
-        </div>
-
-        <p>After verifying your OTP, you will be able to upload these documents through the app to complete your store registration.</p>
+        <p>After verifying your OTP, you will be able to complete your store registration through the app.</p>
 
         <p>If you didn't request this verification, please ignore this email.</p>
 

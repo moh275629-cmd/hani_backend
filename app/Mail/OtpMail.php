@@ -8,7 +8,6 @@ use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
-use App\Models\RequiredDocuments;
 
 class OtpMail extends Mailable
 {
@@ -17,7 +16,6 @@ class OtpMail extends Mailable
     public $otp;
     public $email;
     public $userRole;
-    public $requiredDocuments;
 
     /**
      * Create a new message instance.
@@ -27,13 +25,6 @@ class OtpMail extends Mailable
         $this->otp = $otp;
         $this->email = $email;
         $this->userRole = $userRole;
-        
-        // Get required documents for store role
-        if ($userRole === 'store') {
-            $this->requiredDocuments = RequiredDocuments::getRequiredForUserCategory('store');
-        } else {
-            $this->requiredDocuments = collect();
-        }
     }
 
     /**
@@ -62,9 +53,8 @@ class OtpMail extends Mailable
             'email' => $this->email,
         ];
         
-        // Add document requirements for store role
-        if ($this->userRole === 'store' && $this->requiredDocuments->isNotEmpty()) {
-            $data['requiredDocuments'] = $this->requiredDocuments;
+        // Use store-specific template for store role
+        if ($this->userRole === 'store') {
             $view = 'emails.otp-store';
         }
         

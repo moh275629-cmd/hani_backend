@@ -228,6 +228,7 @@ class BusinessTypeController extends Controller
             $validator = Validator::make($request->all(), [
                 'action' => 'required|in:approve,assign',
                 'business_type_key' => 'required_if:action,assign|string|exists:business_types,key',
+                'custom_type_text' => 'nullable|string|max:255',
             ]);
 
             if ($validator->fails()) {
@@ -241,8 +242,10 @@ class BusinessTypeController extends Controller
             DB::beginTransaction();
 
             if ($request->action === 'approve') {
-                // Create new business type from custom type
-                $key = strtolower(str_replace([' ', '-', '.'], '_', $store->custom_business_type));
+                // Use edited text if provided, otherwise use the original custom business type
+                $customTypeText = $request->custom_type_text ?? $store->custom_business_type;
+                
+                $key = strtolower(str_replace([' ', '-', '.'], '_', $customTypeText));
                 $key = preg_replace('/[^a-z_]/', '', $key);
                 
                 // Ensure key is unique
@@ -254,7 +257,7 @@ class BusinessTypeController extends Controller
                 }
 
                 $businessType = BusinessType::create([
-                    'name' => $store->custom_business_type,
+                    'name' => $customTypeText,
                     'key' => $key,
                     'description' => "Custom business type created from store: {$store->store_name}",
                     'is_active' => true,
