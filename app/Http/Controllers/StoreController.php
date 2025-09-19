@@ -26,6 +26,13 @@ class StoreController extends Controller
 
         $query = Store::where('is_approved', true);
         $query->with('user');
+        
+        // Debug: Log initial query conditions
+        \Log::info('StoreController: Initial query setup', [
+            'is_approved_condition' => true,
+            'base_query_sql' => $query->toSql(),
+            'base_query_bindings' => $query->getBindings()
+        ]);
         // Filter by category if provided
         if ($request->has('category')) {
             $query->where('category', $request->category);
@@ -55,10 +62,17 @@ class StoreController extends Controller
         // Filter by state against store or its branches
         if ($request->has('state')) {
             $state = $request->get('state');
+            
+            \Log::info('StoreController: Filtering by state', [
+                'requested_state' => $state,
+                'state_type' => gettype($state)
+            ]);
 
             $query->where(function ($q) use ($state) {
-                // Primary store state match (exact only)
+                // Primary store state match (exact only) - handle both string and integer
                 $q->where('state', $state)
+                  ->orWhere('state', (string)$state)
+                  ->orWhere('state', (int)$state)
                   
                   // OR stores that have active branches in this state
                   ->orWhereExists(function ($sub) use ($state) {
@@ -66,7 +80,9 @@ class StoreController extends Controller
                           ->from('store_branches')
                           ->whereColumn('store_branches.store_id', 'stores.id')
                           ->where('store_branches.is_active', true)
-                          ->where('store_branches.wilaya_code', $state);
+                          ->where('store_branches.wilaya_code', $state)
+                          ->orWhere('store_branches.wilaya_code', (string)$state)
+                          ->orWhere('store_branches.wilaya_code', (int)$state);
                   });
             });
         }
@@ -74,7 +90,38 @@ class StoreController extends Controller
 
 
         $stores = $query->get();
-
+        
+        // Debug: Log the SQL query and results
+        \Log::info('StoreController: Query executed', [
+            'sql' => $query->toSql(),
+            'bindings' => $query->getBindings(),
+            'stores_count' => $stores->count()
+        ]);
+        
+        // Debug: Log sample store data to check state field types
+        if ($stores->count() > 0) {
+            $sampleStore = $stores->first();
+            \Log::info('StoreController: Sample store data', [
+                'store_id' => $sampleStore->id,
+                'store_name' => $sampleStore->store_name,
+                'state' => $sampleStore->state,
+                'state_type' => gettype($sampleStore->state)
+            ]);
+        } else {
+            // If no stores found, let's check what stores exist without filtering
+            $allStores = \App\Models\Store::select('id', 'store_name', 'state')->get();
+            \Log::info('StoreController: No filtered stores found, checking all stores', [
+                'total_stores' => $allStores->count(),
+                'sample_stores' => $allStores->take(5)->map(function($store) {
+                    return [
+                        'id' => $store->id,
+                        'name' => $store->store_name,
+                        'state' => $store->state,
+                        'state_type' => gettype($store->state)
+                    ];
+                })->toArray()
+            ]);
+        }
 
         return response()->json([
             'message' => 'Stores retrieved successfully',
