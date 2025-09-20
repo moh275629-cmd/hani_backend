@@ -108,50 +108,85 @@ class DocumentController extends Controller
     }
 
     public function view($id): Response
-    {
-        try {
-            $doc = Document::findOrFail($id);
-            
-            // Optional: Add authentication if needed
-            // if (!Auth::check()) {
-            //     return response('Unauthorized', 401);
-            // }
-            
-            $client = new Client();
-            $response = $client->get($doc->file_path, [
-                'timeout' => 30,
-                'headers' => [
-                    'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                    'Accept' => 'application/pdf, */*'
-                ]
-            ]);
-            
-            $content = $response->getBody()->getContents();
-            $contentType = $response->getHeaderLine('Content-Type') ?: 'application/pdf';
-            
-            // Get filename from URL or use document name
-            $filename = basename(parse_url($doc->file_path, PHP_URL_PATH)) ?: 'document.pdf';
-            
-            return response($content, 200)
-                ->header('Content-Type', $contentType)
-                ->header('Content-Disposition', 'inline; filename="' . $filename . '"')
-                ->header('Cache-Control', 'public, max-age=3600'); // 1 hour cache
+{
+    try {
+        $doc = Document::findOrFail($id);
+        
+        Log::info('Attempting to fetch document from Cloudinary', [
+            'document_id' => $id,
+            'cloudinary_url' => $doc->file_path,
+            'user_agent' => request()->userAgent()
+        ]);
 
-        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
-            return response('Document not found', 404);
-        } catch (RequestException $e) {
-            Log::error('Cloudinary request failed: ' . $e->getMessage(), [
+        $client = new Client();
+        $response = $client->get($doc->file_path, [
+            'timeout' => 15,
+            'connect_timeout' => 10,
+            'headers' => [
+                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'Accept' => 'application/pdf, */*',
+                'Referer' => request()->root() // Add referer to avoid blocking
+            ],
+            'verify' => false, // Disable SSL verification if needed
+        ]);
+        
+        $content = $response->getBody()->getContents();
+        $contentType = $response->getHeaderLine('Content-Type') ?: 'application/pdf';
+        
+        // Validate it's actually a PDF
+        if (strpos($contentType, 'pdf') === false && !preg_match('/%PDF-1\./', substr($content, 0, 1024))) {
+            Log::warning('Document content is not PDF', [
                 'document_id' => $id,
-                'url' => $doc->file_path ?? 'unknown'
+                'content_type' => $contentType,
+                'content_start' => substr($content, 0, 100)
             ]);
-            return response('Failed to fetch document from storage', 502);
-        } catch (\Exception $e) {
-            Log::error('Document view error: ' . $e->getMessage(), [
-                'document_id' => $id
-            ]);
-            return response('Internal server error', 500);
+            return response('Document is not a valid PDF', 400);
         }
+        
+        $filename = basename(parse_url($doc->file_path, PHP_URL_PATH)) ?: 'document.pdf';
+        
+        Log::info('Successfully fetched document from Cloudinary', [
+            'document_id' => $id,
+            'content_length' => strlen($content),
+            'content_type' => $contentType
+        ]);
+        
+        return response($content, 200)
+            ->header('Content-Type', $contentType)
+            ->header('Content-Disposition', 'inline; filename="' . $filename . '"')
+            ->header('Cache-Control', 'public, max-age=3600')
+            ->header('Access-Control-Allow-Origin', '*');
+
+    } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+        Log::error('Document not found', ['document_id' => $id]);
+        return response('Document not found', 404);
+        
+    } catch (RequestException $e) {
+        Log::error('Cloudinary request failed', [
+            'document_id' => $id,
+            'error' => $e->getMessage(),
+            'url' => $doc->file_path ?? 'unknown',
+            'response' => $e->hasResponse() ? $e->getResponse()->getBody()->getContents() : 'No response'
+        ]);
+        
+        // Provide more specific error messages
+        if ($e->getCode() === 404) {
+            return response('Document not found on Cloudinary', 404);
+        } elseif ($e->getCode() === 403) {
+            return response('Access denied to document', 403);
+        } else {
+            return response('Failed to fetch document from storage: ' . $e->getMessage(), 502);
+        }
+        
+    } catch (\Exception $e) {
+        Log::error('Document view error', [
+            'document_id' => $id,
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ]);
+        return response('Internal server error: ' . $e->getMessage(), 500);
     }
+}
 
     public function listByUser($userId): JsonResponse
     {
