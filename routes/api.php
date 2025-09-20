@@ -409,7 +409,7 @@ Route::post('/store/documents/login', [App\Http\Controllers\DocumentController::
 Route::post('/store/documents/list-by-credentials', [DocumentController::class, 'listByCredentials']);
 Route::delete('/store/documents/delete-by-credentials', [DocumentController::class, 'deleteByCredentials']);
 Route::post('/store/documents/delete-by-credentials', [DocumentController::class, 'deleteByCredentials']);
-
+Route::get('/documents/{id}/view', [DocumentController::class, 'view']);
 Route::get('/php-config', function () {
     return response()->json([
         'upload_max_filesize' => ini_get('upload_max_filesize'),
