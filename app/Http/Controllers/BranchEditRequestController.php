@@ -99,7 +99,12 @@ class BranchEditRequestController extends Controller
     public function getWilayaRequests(Request $request)
     {
         $user = Auth::user();
-        $admin = $user->admin;
+        if($user->isGlobalAdmin()){
+            $admin=$user;
+        }
+        else{
+            $admin = $user->admin;
+        }
         
         if (!$admin) {
             return response()->json(['message' => 'Admin not found'], 404);
@@ -160,7 +165,9 @@ class BranchEditRequestController extends Controller
 
         // Check authorization based on admin type
         if ($user->isGlobalAdmin()) {
-            // Global admin can process any request
+            if ($request->has('wilaya_code') && $request->wilaya_code) {
+                $editRequest->where('wilaya_code', $request->wilaya_code);
+            }
         } else {
             // Regular wilaya admin can only process requests for their wilaya
             if (!$admin->wilaya_code) {

@@ -105,7 +105,7 @@ class AdminController extends Controller
             }
 
             // Ensure the user is an admin
-            if ($admin->role !== 'admin') {
+            if ($admin->role !== 'admin' && $admin->role !== 'global_admin') {
                 return response()->json([
                     'message' => 'User is not an admin',
                     'updated' => false,
