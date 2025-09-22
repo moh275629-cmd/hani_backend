@@ -2,7 +2,6 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\CloudinarySignatureController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\LoyaltyCardController;
 use App\Http\Controllers\OfferController;
@@ -551,49 +550,4 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/required-documents/required/{category}', [RequiredDocumentsController::class, 'getRequiredForCategory']);
 });
 
-// Test route for Cloudinary configuration
-Route::get('/test-cloudinary-config', function () {
-    try {
-        return response()->json([
-            'cloudinary_config' => [
-                'cloud_name' => config('cloudinary.cloud_name') ?? config('services.cloudinary.cloud_name'),
-                'api_key' => config('cloudinary.api_key') ?? config('services.cloudinary.api_key'),
-                'api_secret' => config('cloudinary.api_secret') ? 'Set' : 'Not Set',
-                'secure' => config('cloudinary.secure') ?? config('services.cloudinary.secure'),
-            ],
-            'env_vars' => [
-                'CLOUDINARY_CLOUD_NAME' => env('CLOUDINARY_CLOUD_NAME'),
-                'CLOUDINARY_API_KEY' => env('CLOUDINARY_API_KEY'),
-                'CLOUDINARY_API_SECRET' => env('CLOUDINARY_API_SECRET') ? 'Set' : 'Not Set',
-                'CLOUDINARY_SECURE' => env('CLOUDINARY_SECURE'),
-            ]
-        ]);
-    } catch (\Exception $e) {
-        return response()->json(['error' => $e->getMessage()], 500);
-    }
-});
-
-// Test route for Cloudinary upload
-Route::post('/test-cloudinary-upload', function (Request $request) {
-    try {
-        $cloudinaryService = app(\App\Services\CloudinaryService::class);
-        
-        if (!$request->hasFile('test_file')) {
-            return response()->json(['error' => 'No file provided'], 400);
-        }
-        
-        $file = $request->file('test_file');
-        $result = $cloudinaryService->uploadFile($file, 'test');
-        
-        return response()->json($result);
-    } catch (\Exception $e) {
-        return response()->json([
-            'error' => $e->getMessage(),
-            'trace' => $e->getTraceAsString()
-        ], 500);
-    }
-});
-
-// Cloudinary signature endpoint for client-side direct uploads
-Route::post('/cloudinary/signature', [CloudinarySignatureController::class, 'sign']);
 

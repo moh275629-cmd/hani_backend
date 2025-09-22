@@ -143,7 +143,7 @@ class OfferController extends Controller
                 $offer->title = $this->cleanString($offer->title);
                 $offer->description = $this->cleanString($offer->description);
                 
-                // Prioritize Cloudinary URLs over blob
+                // Use FTP URLs for images
                 $offer->image_url = $offer->getMainMediaUrl() 
                     ?: ($offer->hasImageBlob() ? url("/api/images/offer/{$offer->id}") : null);
                 
@@ -236,7 +236,7 @@ public function show($offerId): JsonResponse
 
     $offer->load(['store']);
 
-    // Add image URL to offer - prioritize Cloudinary URLs over blob
+    // Add image URL to offer - use FTP URLs for images
     $offer->image_url = $offer->getMainMediaUrl() 
         ?: ($offer->hasImageBlob() ? url("/api/images/offer/{$offer->id}") : null);
 

@@ -229,26 +229,26 @@ class Store extends Model
         return !empty($this->banner_blob);
     }
 
-    // Cloudinary image methods
-    public function setMainImage($cloudinaryUrl)
+    // FTP image methods
+    public function setMainImage($ftpUrl)
     {
-        $this->main_image_url = $cloudinaryUrl;
+        $this->main_image_url = $ftpUrl;
         $this->save();
     }
 
-    public function addGalleryImage($cloudinaryUrl)
+    public function addGalleryImage($ftpUrl)
     {
         $gallery = $this->gallery_images ?? [];
-        $gallery[] = $cloudinaryUrl;
+        $gallery[] = $ftpUrl;
         $this->gallery_images = $gallery;
         $this->save();
     }
 
-    public function removeGalleryImage($cloudinaryUrl)
+    public function removeGalleryImage($ftpUrl)
     {
         $gallery = $this->gallery_images ?? [];
-        $gallery = array_filter($gallery, function($url) use ($cloudinaryUrl) {
-            return $url !== $cloudinaryUrl;
+        $gallery = array_filter($gallery, function($url) use ($ftpUrl) {
+            return $url !== $ftpUrl;
         });
         $this->gallery_images = array_values($gallery);
         $this->save();

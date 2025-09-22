@@ -196,10 +196,10 @@ class Offer extends Model
         return !empty($this->image_blob);
     }
 
-    // Cloudinary media methods
-    public function setMainMedia($cloudinaryUrl)
+    // FTP media methods
+    public function setMainMedia($ftpUrl)
     {
-        $this->main_media_url = $cloudinaryUrl;
+        $this->main_media_url = $ftpUrl;
         $this->save();
     }
 
@@ -216,11 +216,11 @@ class Offer extends Model
         $this->save();
     }
     
-    public function removeGalleryMedia($cloudinaryUrl)
+    public function removeGalleryMedia($ftpUrl)
     {
         $gallery = $this->gallery_media ?? [];
-        $gallery = array_filter($gallery, function($media) use ($cloudinaryUrl) {
-            return $media['url'] !== $cloudinaryUrl;
+        $gallery = array_filter($gallery, function($media) use ($ftpUrl) {
+            return $media['url'] !== $ftpUrl;
         });
         $this->gallery_media = array_values($gallery);
         $this->save();

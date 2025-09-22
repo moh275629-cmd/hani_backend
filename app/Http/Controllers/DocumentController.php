@@ -40,13 +40,13 @@ class DocumentController extends Controller
             if ($request->hasFile('documents')) {
                 return response()->json([
                     'message' => 'Validation error',
-                    'errors' => ['Direct file uploads are not allowed. Provide Cloudinary PDF URLs only.'],
+                    'errors' => ['Direct file uploads are not allowed. Provide FTP PDF URLs only.'],
                 ], 422);
             }
 
             $uploaded = [];
 
-            // Accept direct Cloudinary PDF URLs only
+            // Accept FTP PDF URLs only
             foreach ($request->input('document_urls', []) as $index => $docUrl) {
                 if (!is_string($docUrl) || stripos($docUrl, 'http') !== 0 || !preg_match('/\.pdf(\?|$)/i', $docUrl)) {
                     return response()->json([
@@ -55,12 +55,12 @@ class DocumentController extends Controller
                     ], 422);
                 }
 
-                // Enforce Cloudinary host
+                // Accept FTP URLs (hani.anpcecom.dz)
                 $host = parse_url($docUrl, PHP_URL_HOST);
-                if (!is_string($host) || stripos($host, 'res.cloudinary.com') === false) {
+                if (!is_string($host) || stripos($host, 'hani.anpcecom.dz') === false) {
                     return response()->json([
                         'message' => 'Validation error',
-                        'errors' => ["document_urls.$index must be a Cloudinary URL"],
+                        'errors' => ["document_urls.$index must be an FTP URL from hani.anpcecom.dz"],
                     ], 422);
                 }
 
@@ -112,9 +112,9 @@ class DocumentController extends Controller
     try {
         $doc = Document::findOrFail($id);
         
-        Log::info('Attempting to fetch document from Cloudinary', [
+        Log::info('Attempting to fetch document from FTP', [
             'document_id' => $id,
-            'cloudinary_url' => $doc->file_path,
+            'ftp_url' => $doc->file_path,
             'user_agent' => request()->userAgent()
         ]);
 
@@ -145,7 +145,7 @@ class DocumentController extends Controller
         
         $filename = basename(parse_url($doc->file_path, PHP_URL_PATH)) ?: 'document.pdf';
         
-        Log::info('Successfully fetched document from Cloudinary', [
+        Log::info('Successfully fetched document from FTP', [
             'document_id' => $id,
             'content_length' => strlen($content),
             'content_type' => $contentType
@@ -162,7 +162,7 @@ class DocumentController extends Controller
         return response('Document not found', 404);
         
     } catch (RequestException $e) {
-        Log::error('Cloudinary request failed', [
+        Log::error('FTP request failed', [
             'document_id' => $id,
             'error' => $e->getMessage(),
             'url' => $doc->file_path ?? 'unknown',
@@ -171,7 +171,7 @@ class DocumentController extends Controller
         
         // Provide more specific error messages
         if ($e->getCode() === 404) {
-            return response('Document not found on Cloudinary', 404);
+            return response('Document not found on FTP server', 404);
         } elseif ($e->getCode() === 403) {
             return response('Access denied to document', 403);
         } else {
@@ -273,7 +273,7 @@ class DocumentController extends Controller
             if ($request->hasFile('documents')) {
                 return response()->json([
                     'message' => 'Validation error',
-                    'errors' => ['Direct file uploads are not allowed. Provide Cloudinary PDF URLs only.'],
+                    'errors' => ['Direct file uploads are not allowed. Provide FTP PDF URLs only.'],
                 ], 422);
             }
 
@@ -284,7 +284,7 @@ class DocumentController extends Controller
                 'has_files' => $request->hasFile('documents')
             ]);
 
-            // Accept direct Cloudinary PDF URLs only
+            // Accept FTP PDF URLs only
             foreach ($request->input('document_urls', []) as $index => $docUrl) {
                 if (!is_string($docUrl) || stripos($docUrl, 'http') !== 0 || !preg_match('/\.pdf(\?|$)/i', $docUrl)) {
                     return response()->json([
@@ -294,10 +294,10 @@ class DocumentController extends Controller
                 }
 
                 $host = parse_url($docUrl, PHP_URL_HOST);
-                if (!is_string($host) || stripos($host, 'res.cloudinary.com') === false) {
+                if (!is_string($host) || stripos($host, 'hani.anpcecom.dz') === false) {
                     return response()->json([
                         'message' => 'Validation error',
-                        'errors' => ["document_urls.$index must be a Cloudinary URL"],
+                        'errors' => ["document_urls.$index must be an FTP URL from hani.anpcecom.dz"],
                     ], 422);
                 }
 

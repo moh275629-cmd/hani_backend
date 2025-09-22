@@ -272,7 +272,7 @@ if ($request->has('city')) {
 
         // Add image URLs to offers
         $store->offers->transform(function ($offer) {
-            // Prioritize Cloudinary URLs over blob
+            // Use FTP URLs for images
             $offer->image_url = $offer->getMainMediaUrl() 
                 ?: ($offer->hasImageBlob() ? url("/api/images/offer/{$offer->id}") : null);
             return $offer;
@@ -329,7 +329,7 @@ if ($request->has('city')) {
 
         // Add image URLs to offers
         $store->offers->transform(function ($offer) {
-            // Prioritize Cloudinary URLs over blob
+            // Use FTP URLs for images
             $offer->image_url = $offer->getMainMediaUrl() 
                 ?: ($offer->hasImageBlob() ? url("/api/images/offer/{$offer->id}") : null);
             return $offer;
