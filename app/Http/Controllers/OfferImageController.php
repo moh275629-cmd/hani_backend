@@ -18,8 +18,8 @@ class OfferImageController extends Controller
         try {
             $request->validate([
                 'image_urls' => 'required|array|min:1|max:10',
-                'image_urls.*' => 'required|url',
-                'main_image_url' => 'nullable|url',
+                'image_urls.*' => ['required','url','regex:/\.(jpg|jpeg|png|webp)(\?.*)?$/i'],
+                'main_image_url' => ['nullable','url','regex:/\.(jpg|jpeg|png|webp)(\?.*)?$/i'],
             ]);
 
             $offer = Offer::findOrFail($offerId);
@@ -89,7 +89,7 @@ class OfferImageController extends Controller
     {
         try {
             $request->validate([
-                'main_image_url' => 'required|url',
+                'main_image_url' => ['required','url','regex:/\.(jpg|jpeg|png|webp)(\?.*)?$/i'],
             ]);
 
             $offer = Offer::findOrFail($offerId);
@@ -192,7 +192,7 @@ class OfferImageController extends Controller
     {
         try {
             $request->validate([
-                'image_url' => 'required|url',
+                'image_url' => ['required','url','regex:/\.(jpg|jpeg|png|webp)(\?.*)?$/i'],
             ]);
 
             $offer = Offer::findOrFail($offerId);
