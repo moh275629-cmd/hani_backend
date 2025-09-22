@@ -75,7 +75,10 @@ class DocumentController extends Controller
                     'id' => $doc->id,
                     'name' => $doc->name,
                     'description' => $doc->description,
+                    // Prefer direct FTP URL for clients
                     'file_url' => $doc->file_path,
+                    // Provide proxy as optional alternative
+                    'proxy_url' => url("/api/documents/{$doc->id}/view"),
                     'public_id' => null,
                     'created_at' => $doc->created_at,
                 ];
@@ -199,8 +202,12 @@ class DocumentController extends Controller
                         'id' => $doc->id,
                         'name' => $doc->name,
                         'description' => $doc->description,
+                        // Direct FTP URL (preferred by clients)
                         'file_path' => $doc->file_path,
-                        'file_url' => url("/api/documents/{$doc->id}/view"), // Use proxy endpoint
+                        // For backwards compat: also return file_url pointing to FTP
+                        'file_url' => $doc->file_path,
+                        // Provide proxy URL separately if clients want to use it explicitly
+                        'proxy_url' => url("/api/documents/{$doc->id}/view"),
                         'created_at' => $doc->created_at,
                     ];
                 });
@@ -404,8 +411,12 @@ class DocumentController extends Controller
                         'id' => $doc->id,
                         'name' => $doc->name,
                         'description' => $doc->description,
+                        // Direct FTP URL (preferred by clients)
                         'file_path' => $doc->file_path,
-                        'file_url' => url("/api/documents/{$doc->id}/view"), // Use proxy endpoint
+                        // For backwards compat: also return file_url pointing to FTP
+                        'file_url' => $doc->file_path,
+                        // Provide proxy URL separately if clients want to use it explicitly
+                        'proxy_url' => url("/api/documents/{$doc->id}/view"),
                         'created_at' => $doc->created_at,
                     ];
                 });
