@@ -412,10 +412,14 @@ class AdminController extends Controller
     /**
      * Update user profile fields (admin only subset)
      */
-    public function updateUserProfile(Request $request, $user): JsonResponse
+    public function updateUserProfile(Request $request,int $userId): JsonResponse
     {
         $validator = Validator::make($request->all(), [
             'state' => 'sometimes|string|max:100',
+            'name' => 'sometimes|string|max:255',
+            'phone' => 'sometimes|string|max:20',
+            'email' => 'sometimes|email|max:255',
+            'profile_image' => 'sometimes|string|max:1000',
         ]);
 
         if ($validator->fails()) {
@@ -426,7 +430,6 @@ class AdminController extends Controller
         }
 
         try {
-            $userId = is_numeric($user) ? (int) $user : (int) $request->route('user');
             if ($userId <= 0) {
                 return response()->json([
                     'message' => 'Invalid user id',
@@ -451,6 +454,18 @@ class AdminController extends Controller
             $payload = [];
             if ($request->has('state')) {
                 $payload['state'] = $request->state;
+            }
+            if ($request->has('name')) {
+                $payload['name'] = $request->name;
+            }
+            if ($request->has('phone')) {
+                $payload['phone'] = $request->phone;
+            }
+            if ($request->has('email')) {
+                $payload['email'] = $request->email;
+            }
+            if ($request->has('profile_image')) {
+                $payload['profile_image'] = $request->profile_image;
             }
 
 
