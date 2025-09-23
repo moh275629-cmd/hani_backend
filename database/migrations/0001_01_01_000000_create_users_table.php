@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->string('name');
             $table->string('email')->unique();
-            $table->string('phone')->nullable();
+            $table->string('phone')->nullable()->unique();
             $table->string('role')->default('client');
             $table->longText('profile_image')->nullable(); // if you still need base64/text
             $table->string('state')->nullable();

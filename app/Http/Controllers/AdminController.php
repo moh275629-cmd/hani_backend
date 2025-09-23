@@ -414,21 +414,29 @@ class AdminController extends Controller
      */
     public function updateUserProfile(Request $request, int $userId): JsonResponse
     {
+        // Normalize inputs (avoid case/space bypasses)
+        if ($request->has('email')) {
+            $request->merge(['email' => strtolower(trim((string) $request->email))]);
+        }
+        if ($request->has('phone')) {
+            $request->merge(['phone' => trim((string) $request->phone)]);
+        }
+
         $validator = Validator::make($request->all(), [
             'state' => 'sometimes|string|max:100',
             'name' => 'sometimes|string|max:255',
-            'phone' => 'sometimes|string|max:20',
-            'email' => 'sometimes|email|max:255',
+            'phone' => 'sometimes|string|max:20|unique:users,phone,' . $userId,
+            'email' => 'sometimes|email|max:255|unique:users,email,' . $userId,
             'profile_image' => 'sometimes|string|max:1000',
         ]);
-    
+
         if ($validator->fails()) {
             return response()->json([
                 'message' => 'Validation failed',
                 'errors' => $validator->errors()
             ], 422);
         }
-    
+
         try {
             if ($userId <= 0) {
                 return response()->json([
@@ -451,31 +459,7 @@ class AdminController extends Controller
                 ], 404);
             }
     
-            // Check for duplicate email
-            if ($request->has('email') && $request->email !== $userModel->email) {
-                $existingEmailUser = User::where('email', $request->email)
-                    ->first();
-                    
-                if ($existingEmailUser) {
-                    return response()->json([
-                        'message' => 'Email already exists',
-                        'errors' => ['email' => ['The email has already been taken.']]
-                    ], 422);
-                }
-            }
-    
-            // Check for duplicate phone
-            if ($request->has('phone') && $request->phone !== $userModel->phone) {
-                $existingPhoneUser = User::where('phone', $request->phone)
-                    ->first();
-                    
-                if ($existingPhoneUser) {
-                    return response()->json([
-                        'message' => 'Phone number already exists',
-                        'errors' => ['phone' => ['The phone number has already been taken.']]
-                    ], 422);
-                }
-            }
+            // Uniqueness is handled by validator above
     
             $payload = [];
             if ($request->has('state')) {
