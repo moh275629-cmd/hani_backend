@@ -454,7 +454,6 @@ class AdminController extends Controller
             // Check for duplicate email
             if ($request->has('email') && $request->email !== $userModel->email) {
                 $existingEmailUser = User::where('email', $request->email)
-                    ->where('id', '!=', $userId)
                     ->first();
                     
                 if ($existingEmailUser) {
@@ -468,7 +467,6 @@ class AdminController extends Controller
             // Check for duplicate phone
             if ($request->has('phone') && $request->phone !== $userModel->phone) {
                 $existingPhoneUser = User::where('phone', $request->phone)
-                    ->where('id', '!=', $userId)
                     ->first();
                     
                 if ($existingPhoneUser) {
