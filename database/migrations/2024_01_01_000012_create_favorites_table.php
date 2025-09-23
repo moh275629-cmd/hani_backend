@@ -16,12 +16,11 @@ return new class extends Migration
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->string('favorable_type');
             $table->unsignedBigInteger('favorable_id');
-            $table->boolean('is_active')->default(true);
             $table->timestamps();
             
             $table->unique(['user_id', 'favorable_type', 'favorable_id']);
             $table->index(['favorable_type', 'favorable_id']);
-            $table->index(['user_id', 'is_active']);
+            $table->index(['user_id']);
         });
     }
 
