@@ -412,7 +412,7 @@ class AdminController extends Controller
     /**
      * Update user profile fields (admin only subset)
      */
-    public function updateUserProfile(Request $request,int $userId): JsonResponse
+    public function updateUserProfile(Request $request, int $userId): JsonResponse
     {
         $validator = Validator::make($request->all(), [
             'state' => 'sometimes|string|max:100',
@@ -421,14 +421,14 @@ class AdminController extends Controller
             'email' => 'sometimes|email|max:255',
             'profile_image' => 'sometimes|string|max:1000',
         ]);
-
+    
         if ($validator->fails()) {
             return response()->json([
                 'message' => 'Validation failed',
                 'errors' => $validator->errors()
             ], 422);
         }
-
+    
         try {
             if ($userId <= 0) {
                 return response()->json([
@@ -439,7 +439,7 @@ class AdminController extends Controller
                     'db_database' => (string) DB::connection()->getDatabaseName(),
                 ], 400);
             }
-
+    
             $userModel = User::find($userId);
             if (!$userModel) {
                 return response()->json([
@@ -450,7 +450,35 @@ class AdminController extends Controller
                     'db_database' => (string) DB::connection()->getDatabaseName(),
                 ], 404);
             }
-
+    
+            // Check for duplicate email
+            if ($request->has('email') && $request->email !== $userModel->email) {
+                $existingEmailUser = User::where('email', $request->email)
+                    ->where('id', '!=', $userId)
+                    ->first();
+                    
+                if ($existingEmailUser) {
+                    return response()->json([
+                        'message' => 'Email already exists',
+                        'errors' => ['email' => ['The email has already been taken.']]
+                    ], 422);
+                }
+            }
+    
+            // Check for duplicate phone
+            if ($request->has('phone') && $request->phone !== $userModel->phone) {
+                $existingPhoneUser = User::where('phone', $request->phone)
+                    ->where('id', '!=', $userId)
+                    ->first();
+                    
+                if ($existingPhoneUser) {
+                    return response()->json([
+                        'message' => 'Phone number already exists',
+                        'errors' => ['phone' => ['The phone number has already been taken.']]
+                    ], 422);
+                }
+            }
+    
             $payload = [];
             if ($request->has('state')) {
                 $payload['state'] = $request->state;
@@ -467,12 +495,11 @@ class AdminController extends Controller
             if ($request->has('profile_image')) {
                 $payload['profile_image'] = $request->profile_image;
             }
-
-
+    
             if (!empty($payload)) {
                 $userModel->update($payload);
             }
-
+    
             return response()->json([
                 'message' => 'User profile updated successfully',
                 'data' => $userModel,
