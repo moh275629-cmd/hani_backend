@@ -414,53 +414,84 @@ class AdminController extends Controller
      */
     public function updateUserProfile(Request $request, int $userId): JsonResponse
     {
-        // Normalize inputs (avoid case/space bypasses)
+        // Normalize inputs
         if ($request->has('email')) {
             $request->merge(['email' => strtolower(trim((string) $request->email))]);
         }
         if ($request->has('phone')) {
             $request->merge(['phone' => trim((string) $request->phone)]);
         }
-
+    
+        // Basic validation (format only, not uniqueness)
         $validator = Validator::make($request->all(), [
-            'state' => 'sometimes|string|max:100',
-            'name' => 'sometimes|string|max:255',
-            'phone' => 'sometimes|string|max:20|unique:users,phone,' . $userId,
-            'email' => 'sometimes|email|max:255|unique:users,email,' . $userId,
+            'state'         => 'sometimes|string|max:100',
+            'name'          => 'sometimes|string|max:255',
+            'phone'         => 'sometimes|string|max:20',
+            'email'         => 'sometimes|email|max:255',
             'profile_image' => 'sometimes|string|max:1000',
         ]);
-
+    
         if ($validator->fails()) {
             return response()->json([
                 'message' => 'Validation failed',
-                'errors' => $validator->errors()
+                'errors'  => $validator->errors()
             ], 422);
         }
-
+    
         try {
             if ($userId <= 0) {
                 return response()->json([
-                    'message' => 'Invalid user id',
-                    'updated' => false,
-                    'id' => null,
+                    'message'       => 'Invalid user id',
+                    'updated'       => false,
+                    'id'            => null,
                     'db_connection' => config('database.default'),
-                    'db_database' => (string) DB::connection()->getDatabaseName(),
+                    'db_database'   => (string) DB::connection()->getDatabaseName(),
                 ], 400);
             }
     
             $userModel = User::find($userId);
             if (!$userModel) {
                 return response()->json([
-                    'message' => 'User not found',
-                    'updated' => false,
-                    'id' => $userId,
+                    'message'       => 'User not found',
+                    'updated'       => false,
+                    'id'            => $userId,
                     'db_connection' => config('database.default'),
-                    'db_database' => (string) DB::connection()->getDatabaseName(),
+                    'db_database'   => (string) DB::connection()->getDatabaseName(),
                 ], 404);
             }
     
-            // Uniqueness is handled by validator above
+            // ===== Manual uniqueness checks (because values are encrypted in DB) =====
+            if ($request->has('email')) {
+                $normalizedEmail = $request->email;
+                $exists = User::where('id', '!=', $userId)
+                    ->get()
+                    ->contains(fn($u) => strtolower($u->email) === $normalizedEmail);
     
+                if ($exists) {
+                    return response()->json([
+                        'message' => 'Email already exists',
+                        'updated' => false,
+                        'id'      => $userId,
+                    ], 409);
+                }
+            }
+    
+            if ($request->has('phone')) {
+                $normalizedPhone = $request->phone;
+                $exists = User::where('id', '!=', $userId)
+                    ->get()
+                    ->contains(fn($u) => $u->phone === $normalizedPhone);
+    
+                if ($exists) {
+                    return response()->json([
+                        'message' => 'Phone already exists',
+                        'updated' => false,
+                        'id'      => $userId,
+                    ], 409);
+                }
+            }
+    
+            // ===== Build payload =====
             $payload = [];
             if ($request->has('state')) {
                 $payload['state'] = $request->state;
@@ -483,20 +514,21 @@ class AdminController extends Controller
             }
     
             return response()->json([
-                'message' => 'User profile updated successfully',
-                'data' => $userModel,
-                'updated' => true,
-                'id' => $userId,
+                'message'       => 'User profile updated successfully',
+                'data'          => $userModel,
+                'updated'       => true,
+                'id'            => $userId,
                 'db_connection' => config('database.default'),
-                'db_database' => (string) DB::connection()->getDatabaseName(),
+                'db_database'   => (string) DB::connection()->getDatabaseName(),
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'message' => 'Error updating user profile',
-                'error' => $e->getMessage()
+                'error'   => $e->getMessage()
             ], 500);
         }
     }
+    
 
     /**
      * Get all stores with pagination and filters

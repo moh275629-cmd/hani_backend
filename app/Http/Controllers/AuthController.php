@@ -583,50 +583,74 @@ class AuthController extends Controller
      * Update user profile
      */
     public function updateProfile(Request $request)
-    {
-        $user = $request->user();
-        
-        $validator = Validator::make($request->all(), [
-            'name' => 'sometimes|string|max:255',
-            'phone' => 'sometimes|string|max:20|unique:users,phone,' . $user->id,
-            'state' => 'sometimes|string|max:100',
-            'state_code' => 'sometimes|string|max:10',
-            'profile_image' => 'sometimes|string|max:1000',
-        ]);
+{
+    $user = $request->user();
 
-        if ($validator->fails()) {
+    // Normalize inputs
+    if ($request->has('phone')) {
+        $request->merge(['phone' => trim((string) $request->phone)]);
+    }
+
+    // Validate format only
+    $validator = Validator::make($request->all(), [
+        'name'          => 'sometimes|string|max:255',
+        'phone'         => 'sometimes|string|max:20',
+        'state'         => 'sometimes|string|max:100',
+        'state_code'    => 'sometimes|string|max:10',
+        'profile_image' => 'sometimes|string|max:1000',
+    ]);
+
+    if ($validator->fails()) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Validation failed',
+            'errors'  => $validator->errors()
+        ], 422);
+    }
+
+    // ===== Manual uniqueness check for phone =====
+    if ($request->has('phone')) {
+        $normalizedPhone = $request->phone;
+
+        $exists = User::where('id', '!=', $user->id)
+            ->get()
+            ->contains(fn($u) => $u->phone === $normalizedPhone); // $u->phone is auto-decrypted
+
+        if ($exists) {
             return response()->json([
                 'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $validator->errors()
-            ], 422);
+                'message' => 'Phone number already exists',
+                'errors'  => ['phone' => ['The phone number has already been taken.']]
+            ], 409);
         }
-
-        // Update user profile fields
-        $updateData = $request->only(['name', 'phone', 'state', 'state_code']);
-        
-        // Handle profile image URL update
-        if ($request->has('profile_image') && $request->profile_image) {
-            $updateData['profile_image'] = $request->profile_image;
-        }
-        
-        $user->update($updateData);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Profile updated successfully',
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'phone' => $user->phone,
-                'role' => $user->role,
-                'state' => $user->state,
-                'state_code' => $user->state_code,
-                'profile_image' => $user->profile_image,
-            ],
-        ]);
     }
+
+    // ===== Build update data =====
+    $updateData = $request->only(['name', 'phone', 'state', 'state_code']);
+
+    if ($request->has('profile_image') && $request->profile_image) {
+        $updateData['profile_image'] = $request->profile_image;
+    }
+
+    // Apply update
+    $user->update($updateData);
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Profile updated successfully',
+        'user'    => [
+            'id'            => $user->id,
+            'name'          => $user->name,
+            'email'         => $user->email,
+            'phone'         => $user->phone,
+            'role'          => $user->role,
+            'state'         => $user->state,
+            'state_code'    => $user->state_code,
+            'profile_image' => $user->profile_image,
+        ],
+    ]);
+}
+
 
     /**
      * Change user password
