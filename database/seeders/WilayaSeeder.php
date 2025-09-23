@@ -69,9 +69,8 @@ class WilayaSeeder extends Seeder
             ['code' => '54', 'name_en' => 'Timimoun', 'name_fr' => 'Timimoun', 'name_ar' => 'تيميمون'],
             ['code' => '55', 'name_en' => 'Touggourt', 'name_fr' => 'Touggourt', 'name_ar' => 'تقرت'],
             ['code' => '56', 'name_en' => 'Djanet', 'name_fr' => 'Djanet', 'name_ar' => 'جانت'],
-            ['code' => '57', 'name_en' => 'M\'Sila', 'name_fr' => 'M\'Sila', 'name_ar' => 'المسيلة'],
-            ['code' => '58', 'name_en' => 'In Salah', 'name_fr' => 'In Salah', 'name_ar' => 'عين صالح'],
-            ['code' => '59', 'name_en' => 'In Guezzam', 'name_fr' => 'In Guezzam', 'name_ar' => 'عين قزام'],
+             ['code' => '57', 'name_en' => 'In Salah', 'name_fr' => 'In Salah', 'name_ar' => 'عين صالح'],
+            ['code' => '58', 'name_en' => 'In Guezzam', 'name_fr' => 'In Guezzam', 'name_ar' => 'عين قزام'],
         ];
 
         foreach ($wilayas as $wilaya) {
