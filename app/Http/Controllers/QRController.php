@@ -32,7 +32,8 @@ class QRController extends Controller
             'qr_data' => 'required|string',
             'store_id' => 'required|exists:stores,id',
             'notes' => 'nullable|string|max:1000',
-            'offer_id' => 'required|exists:offers,id',
+            'offer_ids' => 'nullable|array',
+            'offer_ids.*' => 'exists:offers,id',
         ]);
 
         if ($validator->fails()) {
@@ -50,7 +51,7 @@ class QRController extends Controller
                 'qr_data' => $request->qr_data,
                 'parsed_qr_data' => $qrData,
                 'store_id' => $request->store_id,
-                'offer_id' => $request->offer_id
+                'offer_ids' => $request->offer_ids
             ]);
 
             if (!$qrData) {
@@ -128,56 +129,103 @@ class QRController extends Controller
           
             
             try {
-                $purchaseData = [
-                    'user_id' => $loyaltyCard->user_id,
-                    'store_id' => $storeId,
-                    'redeemed_offer_id' => $request->offer_id,
-                    'purchase_number' => $this->generateTransactionId(),
-                    'products' => json_encode([
-                        [
-                            'name' => 'Store Purchase',
-                            'quantity' => 1,
-                            'price' => 0,
-                        ],
-                    ]),
-                    'subtotal' => 0,
-                    'discount_amount' => 0,
-                    'tax_amount' => 0,
-                    'total_amount' => 0,
-                    'points_earned' => 0,
-                    'points_spent' => 0,
-                    'status' => 'completed',
-                    'payment_method' => 'cash',
-                    'notes' => $request->notes,
-                    'purchase_date' => now(),
-                ];
+                // Create a purchase for each selected offer
+                $purchases = [];
+                $offerIds = $request->offer_ids ?? [];
                 
-                \Log::info('Purchase data prepared', $purchaseData);
+                if (empty($offerIds)) {
+                    // Create a general purchase if no offers selected
+                    $purchaseData = [
+                        'user_id' => $loyaltyCard->user_id,
+                        'store_id' => $storeId,
+                        'redeemed_offer_id' => null,
+                        'purchase_number' => $this->generateTransactionId(),
+                        'products' => json_encode([
+                            [
+                                'name' => 'Store Purchase',
+                                'quantity' => 1,
+                                'price' => 0,
+                            ],
+                        ]),
+                        'subtotal' => 0,
+                        'discount_amount' => 0,
+                        'tax_amount' => 0,
+                        'total_amount' => 0,
+                        'points_earned' => 0,
+                        'points_spent' => 0,
+                        'status' => 'completed',
+                        'payment_method' => 'cash',
+                        'notes' => $request->notes,
+                        'purchase_date' => now(),
+                    ];
+                    
+                    $purchase = Purchase::create($purchaseData);
+                    $purchases[] = $purchase;
+                } else {
+                    // Create a purchase for each offer
+                    foreach ($offerIds as $offerId) {
+                        $offer = \App\Models\Offer::find($offerId);
+                        if ($offer) {
+                            $purchaseData = [
+                                'user_id' => $loyaltyCard->user_id,
+                                'store_id' => $storeId,
+                                'redeemed_offer_id' => $offerId,
+                                'purchase_number' => $this->generateTransactionId(),
+                                'products' => json_encode([
+                                    [
+                                        'name' => $offer->title,
+                                        'quantity' => 1,
+                                        'price' => 0,
+                                    ],
+                                ]),
+                                'subtotal' => 0,
+                                'discount_amount' => 0,
+                                'tax_amount' => 0,
+                                'total_amount' => 0,
+                                'points_earned' => 0,
+                                'points_spent' => 0,
+                                'status' => 'completed',
+                                'payment_method' => 'cash',
+                                'notes' => $request->notes,
+                                'purchase_date' => now(),
+                            ];
+                            
+                            $purchase = Purchase::create($purchaseData);
+                            $purchases[] = $purchase;
+                        }
+                    }
+                }
                 
-                $purchase = Purchase::create($purchaseData);
-                \Log::info('Purchase created successfully', ['purchase_id' => $purchase->id]);
+                \Log::info('Purchases created successfully', [
+                    'purchase_count' => count($purchases),
+                    'purchase_ids' => array_map(fn($p) => $p->id, $purchases)
+                ]);
             } catch (\Exception $e) {
-                \Log::error('Failed to create purchase', [
+                \Log::error('Failed to create purchases', [
                     'error' => $e->getMessage(), 
                     'trace' => $e->getTraceAsString(),
-                    'purchase_data' => $purchaseData ?? 'not set'
                 ]);
                 throw $e;
             }
 
-            // Update offer usage if offer was applied
-            if ($request->offer_id) {
-                try {
-                    $offer = \App\Models\Offer::find($request->offer_id);
-                    if ($offer) {
-                        $offer->increment('current_usage_count');
-                        \Log::info('Offer usage incremented', ['offer_id' => $request->offer_id]);
-                    } else {
-                        \Log::warning('Offer not found for usage increment', ['offer_id' => $request->offer_id]);
+            // Update offer usage for all applied offers
+            if (!empty($offerIds)) {
+                foreach ($offerIds as $offerId) {
+                    try {
+                        $offer = \App\Models\Offer::find($offerId);
+                        if ($offer) {
+                            $offer->increment('current_usage_count');
+                            \Log::info('Offer usage incremented', ['offer_id' => $offerId]);
+                        } else {
+                            \Log::warning('Offer not found for usage increment', ['offer_id' => $offerId]);
+                        }
+                    } catch (\Exception $e) {
+                        \Log::error('Failed to increment offer usage', [
+                            'offer_id' => $offerId,
+                            'error' => $e->getMessage()
+                        ]);
+                        // Don't fail the transaction for offer usage errors
                     }
-                } catch (\Exception $e) {
-                    \Log::error('Failed to increment offer usage', ['error' => $e->getMessage()]);
-                    // Don't fail the transaction for offer usage errors
                 }
             }
 
@@ -192,13 +240,27 @@ class QRController extends Controller
                 // Don't fail the transaction for timestamp update errors
             }
 
+            // Get offer information for response
+            $appliedOffers = [];
+            if (!empty($offerIds)) {
+                $offers = \App\Models\Offer::whereIn('id', $offerIds)->get();
+                $appliedOffers = $offers->map(function($offer) {
+                    return [
+                        'id' => $offer->id,
+                        'title' => $offer->title,
+                        'description' => $offer->description,
+                    ];
+                })->toArray();
+            }
+            
             return response()->json([
                 'message' => 'QR code scanned successfully',
                 'data' => [
                     'user_name' => $loyaltyCard->user->name,
                     'card_number' => $loyaltyCard->card_number,
-                    'purchase_number' => $purchase->purchase_number,
-                    'offer_applied' => $request->offer_id ? true : false,
+                    'purchase_numbers' => array_map(fn($p) => $p->purchase_number, $purchases),
+                    'offers_applied' => $appliedOffers,
+                    'offer_count' => count($appliedOffers),
                 ]
             ]);
 
