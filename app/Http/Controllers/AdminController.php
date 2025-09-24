@@ -281,22 +281,10 @@ class AdminController extends Controller
                 });
             }
             
-            // Apply pagination
-            $perPage = $request->get('per_page', 15);
-            $page = $request->get('page', 1);
-            $total = $allUsers->count();
-            $offset = ($page - 1) * $perPage;
-            
-            $paginatedUsers = $allUsers->slice($offset, $perPage);
-            
+              
             $data = [
-                'data' => $paginatedUsers->values(),
-                'current_page' => $page,
-                'per_page' => $perPage,
-                'total' => $total,
-                'last_page' => ceil($total / $perPage),
-                'from' => $offset + 1,
-                'to' => min($offset + $perPage, $total),
+                'data' => $allUsers->values(),
+               
             ];
 
             return response()->json([
@@ -1557,34 +1545,14 @@ $offers->transform(function ($offer) {
             // Sort by created_at desc
             $allReports = $allReports->sortByDesc('created_at');
             
-            // Apply pagination manually
-            $perPage = $request->get('per_page', 20);
-            $page = $request->get('page', 1);
-            $total = $allReports->count();
-            $offset = ($page - 1) * $perPage;
+         
             
-            $paginatedReports = $allReports->slice($offset, $perPage);
-            
-            // Transform the data to include store information
-            $paginatedReports->transform(function ($report) {
-                $reportData = $report->toArray();
-                
-                // Add store information if the reported user has stores
-                if ($report->reportedUser && $report->reportedUser->stores->isNotEmpty()) {
-                    $reportData['reported_store'] = $report->reportedUser->stores->first()->toArray();
-                }
-                
-                return $reportData;
-            });
+             // Transform the data to include store information
+          
             
             $data = [
-                'data' => $paginatedReports->values(),
-                'current_page' => $page,
-                'per_page' => $perPage,
-                'total' => $total,
-                'last_page' => ceil($total / $perPage),
-                'from' => $offset + 1,
-                'to' => min($offset + $perPage, $total),
+                'data' => $allReports->values(),
+           
             ];
 
             return response()->json([
@@ -1644,21 +1612,11 @@ $offers->transform(function ($offer) {
             $allActivations = $allActivations->sortByDesc('deactivate_at');
             
             // Apply pagination manually
-            $perPage = $request->get('per_page', 20);
-            $page = $request->get('page', 1);
-            $total = $allActivations->count();
-            $offset = ($page - 1) * $perPage;
-            
-            $paginatedActivations = $allActivations->slice($offset, $perPage);
+          
             
             $data = [
-                'data' => $paginatedActivations->values(),
-                'current_page' => $page,
-                'per_page' => $perPage,
-                'total' => $total,
-                'last_page' => ceil($total / $perPage),
-                'from' => $offset + 1,
-                'to' => min($offset + $perPage, $total),
+                'data' => $allActivations->values(),
+        
             ];
 
             return response()->json([
@@ -1719,22 +1677,11 @@ $offers->transform(function ($offer) {
             // Sort by deactivate_at asc
             $allActivations = $allActivations->sortBy('deactivate_at');
             
-            // Apply pagination manually
-            $perPage = $request->get('per_page', 20);
-            $page = $request->get('page', 1);
-            $total = $allActivations->count();
-            $offset = ($page - 1) * $perPage;
-            
-            $paginatedActivations = $allActivations->slice($offset, $perPage);
+          
             
             $data = [
-                'data' => $paginatedActivations->values(),
-                'current_page' => $page,
-                'per_page' => $perPage,
-                'total' => $total,
-                'last_page' => ceil($total / $perPage),
-                'from' => $offset + 1,
-                'to' => min($offset + $perPage, $total),
+                'data' => $allActivations->values(),
+               
             ];
 
             return response()->json([
@@ -1764,7 +1711,7 @@ $offers->transform(function ($offer) {
                     'error' => 'Only admins can view pending client approvals'
                 ], 403);
             }
-
+    
             // Get all users first (since state is encrypted, we need to filter after decryption)
             $allUsers = User::all();
             
@@ -1783,21 +1730,22 @@ $offers->transform(function ($offer) {
                 });
             }
             
+            // Apply search filter
+            if ($request->has('search')) {
+                $search = $request->search;
+                $allUsers = $allUsers->filter(function ($user) use ($search) {
+                    return $user->searchByEncryptedFields($search);
+                });
+            }
+            
             // Filter for clients that are not approved
             $pendingClients = $allUsers->filter(function ($user) {
                 return $user->role === 'client' && !$user->is_approved;
             })->values();
-
-            // Apply pagination manually
-            $perPage = $request->get('per_page', 20);
-            $page = $request->get('page', 1);
-            $total = $pendingClients->count();
-            $offset = ($page - 1) * $perPage;
-            
-            $paginatedClients = $pendingClients->slice($offset, $perPage);
-            
+    
+               
             $data = [
-                'data' => $paginatedClients->map(function ($user) {
+                'data' => $pendingClients->map(function ($user) {
                     return [
                         'id' => $user->id,
                         'name' => $user->name,
@@ -1810,20 +1758,15 @@ $offers->transform(function ($offer) {
                         'created_at' => $user->created_at,
                     ];
                 }),
-                'current_page' => $page,
-                'per_page' => $perPage,
-                'total' => $total,
-                'last_page' => ceil($total / $perPage),
-                'from' => $offset + 1,
-                'to' => min($offset + $perPage, $total),
+             
             ];
-
+    
             return response()->json([
                 'success' => true,
                 'message' => 'Pending client approvals retrieved successfully',
                 'data' => $data
             ]);
-
+    
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -1832,8 +1775,7 @@ $offers->transform(function ($offer) {
             ], 500);
         }
     }
-
-    /**
+        /**
      * Approve client account
      */
     public function approveClient(Request $request, $userId): JsonResponse
