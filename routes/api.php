@@ -295,6 +295,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/users/{user}', [AdminController::class, 'user']);
         Route::put('/users/{user}', [AdminController::class, 'updateUserProfile']);
         Route::put('/users/{user}/status', [AdminController::class, 'updateUserStatus']);
+        Route::post('/clients/{userId}/reject', [AdminController::class, 'rejectClient']);
         Route::get('/stores', [AdminController::class, 'stores']);
         Route::post('/stores', [AdminController::class, 'createStore']);
         Route::put('/stores/{store}', [AdminController::class, 'updateStore']);

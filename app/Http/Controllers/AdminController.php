@@ -1831,6 +1831,70 @@ $offers->transform(function ($offer) {
     }
 
     /**
+     * Reject client account (delete the user) – mirrors store rejection flow
+     */
+    public function rejectClient(Request $request, $userId): JsonResponse
+    {
+        try {
+            $currentUser = auth()->user();
+
+            if (!$currentUser->isAdmin() && !$currentUser->isGlobalAdmin()) {
+                return response()->json([
+                    'message' => 'Unauthorized',
+                    'error' => 'Only admins can reject clients'
+                ], 403);
+            }
+
+            $validator = Validator::make($request->all(), [
+                'reason' => 'required|string|max:255',
+            ]);
+            if ($validator->fails()) {
+                return response()->json([
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $user = User::find($userId);
+            if (!$user) {
+                return response()->json([
+                    'message' => 'User not found',
+                    'deleted' => 0,
+                    'id' => (int) $userId,
+                ], 404);
+            }
+
+            if ($user->role !== 'client') {
+                return response()->json([
+                    'message' => 'Invalid user',
+                    'error' => 'Only client accounts can be rejected'
+                ], 400);
+            }
+
+            // Optional: send rejection email before delete
+            try {
+                Mail::to($user->email)->send(new \App\Mail\ClientRejectedMail($user, $request->reason));
+            } catch (\Exception $e) {
+                Log::error('Failed to send client rejection email: ' . $e->getMessage());
+            }
+
+            // Delete the user
+            $user->delete();
+
+            return response()->json([
+                'message' => 'Client rejected successfully',
+                'deleted' => 1,
+                'id' => (int) $userId,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Error rejecting client',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
      * Send client approval email
      */
     private function sendClientApprovalEmail(User $user): void
