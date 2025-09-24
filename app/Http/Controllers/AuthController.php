@@ -49,6 +49,7 @@ class AuthController extends Controller
         }
 
         // Check if phone already exists (handles encrypted phones)
+       if($request->phone != null){
         $existingUserByPhone = User::findByPhone($request->phone);
         if ($existingUserByPhone) {
             return response()->json([
@@ -57,6 +58,7 @@ class AuthController extends Controller
                 'errors' => ['phone' => ['The phone number has already been taken.']]
             ], 422);
         }
+       }
 
         // Create user
         $user = User::create([
