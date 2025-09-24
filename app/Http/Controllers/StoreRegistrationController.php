@@ -35,7 +35,7 @@ class StoreRegistrationController extends Controller
         $validator = Validator::make($request->all(), [
             'name'            => 'required|string',
             'email'           => 'required|email',
-            'phone'           => 'required|string',
+            'phone'           => 'nullable',
             'password'        => 'required|confirmed',
             'state'           => 'required|string',
             'postal_code'     => 'nullable|string', // or nullable|string (choose one)
@@ -87,13 +87,15 @@ class StoreRegistrationController extends Controller
         }
 
         // Check if phone already exists (handles encrypted phones)
-        $existingUserByPhone = User::findByPhone($request->phone);
+        if($request->phone != null){
+            $existingUserByPhone = User::findByPhone($request->phone);
         if ($existingUserByPhone) {
             return response()->json([
                 'success' => false,
                 'message' => 'Phone number already exists',
                 'errors' => ['phone' => ['The phone number has already been taken.']]
             ], 422);
+        }
         }
 
         // Custom validation for business hours time format
