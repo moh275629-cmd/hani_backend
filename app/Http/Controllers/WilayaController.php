@@ -151,11 +151,7 @@ class WilayaController extends Controller
                 'name_fr' => 'required|string|max:255',
                 'name_ar' => 'required|string|max:255',
                 'is_active' => 'boolean',
-                'admin_office_address' => 'nullable|string',
-                'admin_office_latitude' => 'nullable|numeric|between:-90,90',
-                'admin_office_longitude' => 'nullable|numeric|between:-180,180',
-                'admin_office_phone' => 'nullable|string|max:20',
-                'admin_office_email' => 'nullable|email|max:255',
+                
             ]);
 
             if ($validator->fails()) {
@@ -172,11 +168,7 @@ class WilayaController extends Controller
                 'name_fr' => $request->name_fr,
                 'name_ar' => $request->name_ar,
                 'is_active' => $request->get('is_active', true),
-                'admin_office_address' => $request->admin_office_address,
-                'admin_office_latitude' => $request->admin_office_latitude,
-                'admin_office_longitude' => $request->admin_office_longitude,
-                'admin_office_phone' => $request->admin_office_phone,
-                'admin_office_email' => $request->admin_office_email,
+                
                 'created_by' => Auth::id(),
             ]);
 
@@ -207,11 +199,7 @@ class WilayaController extends Controller
                 'name_fr' => 'sometimes|string|max:255',
                 'name_ar' => 'sometimes|string|max:255',
                 'is_active' => 'boolean',
-                'admin_office_address' => 'nullable|string',
-                'admin_office_latitude' => 'nullable|numeric|between:-90,90',
-                'admin_office_longitude' => 'nullable|numeric|between:-180,180',
-                'admin_office_phone' => 'nullable|string|max:20',
-                'admin_office_email' => 'nullable|email|max:255',
+              
             ]);
 
             if ($validator->fails()) {
@@ -228,12 +216,7 @@ class WilayaController extends Controller
                 'name_fr' => $request->get('name_fr', $wilaya->name_fr),
                 'name_ar' => $request->get('name_ar', $wilaya->name_ar),
                 'is_active' => $request->get('is_active', $wilaya->is_active),
-                'admin_office_address' => $request->get('admin_office_address', $wilaya->admin_office_address),
-                'admin_office_latitude' => $request->get('admin_office_latitude', $wilaya->admin_office_latitude),
-                'admin_office_longitude' => $request->get('admin_office_longitude', $wilaya->admin_office_longitude),
-                'admin_office_phone' => $request->get('admin_office_phone', $wilaya->admin_office_phone),
-                'admin_office_email' => $request->get('admin_office_email', $wilaya->admin_office_email),
-                'updated_by' => Auth::id(),
+                    'updated_by' => Auth::id(),
             ]);
 
             return response()->json([

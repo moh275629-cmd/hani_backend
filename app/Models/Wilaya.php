@@ -18,23 +18,12 @@ class Wilaya extends Model
         'name_fr', 
         'name_ar',
         'is_active',
-        'admin_office_address',
-        'admin_office_latitude',
-        'admin_office_longitude',
-        'admin_office_phone',
-        'admin_office_email',
+      
         'created_by',
         'updated_by',
     ];
 
-    protected $encryptable = [
-        'name_en',
-        'name_fr',
-        'name_ar',
-        'admin_office_address',
-        'admin_office_phone',
-        'admin_office_email',
-    ];
+   
 
     protected $casts = [
         'is_active' => 'boolean',
@@ -158,12 +147,7 @@ class Wilaya extends Model
             'name_fr' => $data['name_fr'],
             'name_ar' => $data['name_ar'],
             'is_active' => $data['is_active'] ?? true,
-            'admin_office_address' => $data['admin_office_address'] ?? null,
-            'admin_office_latitude' => $data['admin_office_latitude'] ?? null,
-            'admin_office_longitude' => $data['admin_office_longitude'] ?? null,
-            'admin_office_phone' => $data['admin_office_phone'] ?? null,
-            'admin_office_email' => $data['admin_office_email'] ?? null,
-            'created_by' => $data['created_by'] ?? null,
+               'created_by' => $data['created_by'] ?? null,
         ]);
     }
 }

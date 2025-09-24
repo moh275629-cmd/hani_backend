@@ -20,12 +20,7 @@ return new class extends Migration
             $table->boolean('is_active')->default(true);
             
             // Admin office details
-            $table->text('admin_office_address')->nullable();
-            $table->decimal('admin_office_latitude', 10, 8)->nullable();
-            $table->decimal('admin_office_longitude', 11, 8)->nullable();
-            $table->string('admin_office_phone')->nullable();
-            $table->string('admin_office_email')->nullable();
-            
+             
             // Admin assignment
             $table->unsignedBigInteger('admin_user_id')->nullable();
             
