@@ -35,49 +35,42 @@ class BusinessTypeController extends Controller
     /**
      * Get business types for dropdown (admin use)
      */
-    public function getForDropdown(): JsonResponse
-    {
-        try {
-            $businessTypes = BusinessType::getActiveTypes();
-    
-            $dropdown = $businessTypes->map(function ($type) {
-                return [
-                    'value' => $type->key,
-                    'label' => $type->name,
-                    'is_system_defined' => $type->is_system_defined,
-                    'usage_count' => $type->usage_count,
-                ];
-            });
-    
-            // Separate "Other" from the rest
-            $otherItem = $dropdown->firstWhere('label', 'Other');
-            $regularItems = $dropdown->reject(fn($item) => $item['label'] === 'Other');
-    
-            // Sort regular items alphabetically
-            $sortedRegularItems = $regularItems->sortBy(function ($item) {
-                return strtolower($item['label']);
-            })->values();
-    
-            // Combine sorted items with "Other" at the end
-            $finalDropdown = $sortedRegularItems;
-            if ($otherItem) {
-                $finalDropdown = $finalDropdown->push($otherItem)->values();
-            }
-    
-            return response()->json([
-                'success' => true,
-                'message' => 'Business types retrieved successfully',
-                'data' => $finalDropdown,
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Error fetching business types for dropdown',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
+ public function getForDropdown(): JsonResponse
+{
+    try {
+        $businessTypes = BusinessType::getActiveTypes();
 
+        $dropdown = $businessTypes->map(function ($type) {
+            return [
+                'value' => $type->key,
+                'label' => $type->name,
+                'is_system_defined' => $type->is_system_defined,
+                'usage_count' => $type->usage_count,
+            ];
+        });
+
+        // Partition items: [others, regular items]
+        [$others, $regularItems] = $dropdown->partition(fn($item) => $item['label'] === 'Other');
+
+        // Sort regular items alphabetically and append "Other" items at the end
+        $finalDropdown = $regularItems
+            ->sortBy(fn($item) => strtolower($item['label']))
+            ->merge($others)
+            ->values();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Business types retrieved successfully',
+            'data' => $finalDropdown,
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Error fetching business types for dropdown',
+            'error' => $e->getMessage()
+        ], 500);
+    }
+}
     
     /**
      * Create a new business type (admin only)

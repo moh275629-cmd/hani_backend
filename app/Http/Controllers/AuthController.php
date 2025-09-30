@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\WelcomeClientMail;
-use App\Mail\WelcomeStoreMail;
+
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rules\Password;
 
@@ -21,6 +21,13 @@ class AuthController extends Controller
      */
     public function register(Request $request)
     {
+        // Blacklist check
+        if (\DB::table('blacklist_emails')->where('email', $request->input('email'))->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Registration blocked. Email is blacklisted due to policy violations.'
+            ], 422);
+        }
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255',
@@ -132,18 +139,10 @@ class AuthController extends Controller
 
         $user = Auth::user();
         
-        // Check client approval FIRST - clients cannot login without approval
-        if ($user->role === 'client' && !$user->is_approved) {
-            Auth::logout();
-            return response()->json([
-                'success' => false,
-                'message' => 'Your client account is pending admin approval. Please wait for approval before logging in.',
-                'requires_approval' => true
-            ], 403);
-        }
+      
         
         // Don't allow login if user is not active - send OTP and redirect to verification
-        if (!$user->is_active) {
+        if (!$user->is_active && $user->role === 'store') {
             // Send OTP email automatically
             try {
                 $this->_sendEmailOtp($user->email, $user->role);
@@ -154,12 +153,21 @@ class AuthController extends Controller
             Auth::logout();
             return response()->json([
                 'success' => false,
-                'message' => 'Please verify your email before logging in. Check your email for the verification code.',
-                'requires_verification' => true,
-                'email' => $user->email,
-            ], 401);
+                'message' => 'Your store account is pending admin approval. Please wait for approval before logging in.',
+                'requires_approval' => true,
+                'role' => $user->role,
+            ], 403);
         }
-        
+          // Check client approval FIRST - clients cannot login without approval
+          if ($user->role === 'client' && $user->is_approved != 1) {
+            Auth::logout();
+            return response()->json([
+                'success' => false,
+                'message' => 'Your client account is pending admin approval. Please wait for approval before logging in.',
+                'requires_approval' => true,
+                'is_appoved'=>$user->is_approved,
+            ], 403);
+        }
         // Check store approval only if user is active
         if ($user->role === 'store' && $user->is_active) {
             $store = \App\Models\Store::where('user_id', $user->id)->first();
@@ -169,7 +177,8 @@ class AuthController extends Controller
                 return response()->json([
                     'success' => false,
                     'message' => 'Your store account is pending admin approval. Please wait for approval before logging in.',
-                    'requires_approval' => true
+                    'requires_approval' => true,
+                    'role'=>$user->role,
                 ], 403);
             }
         }
@@ -380,8 +389,6 @@ class AuthController extends Controller
                     
                     if ($user->role === 'client') {
                         Mail::to($user->email)->send(new WelcomeClientMail($user, $adminInfo));
-                    } elseif ($user->role === 'store' && $store) {
-                        Mail::to($user->email)->send(new WelcomeStoreMail($user, $store, $adminInfo));
                     }
                 } catch (\Exception $e) {
                     \Log::error('Failed to send welcome email: ' . $e->getMessage());
@@ -389,10 +396,7 @@ class AuthController extends Controller
                 }
                 
                 // Create authentication token only for approved users or non-client users
-                $token = null;
-                if ($user->role !== 'client' || $user->is_approved) {
-                    $token = $user->createToken('auth-token')->plainTextToken;
-                }
+                
                 
                 // Prepare response message based on user role and approval status
                 $message = 'OTP verified successfully';
@@ -414,7 +418,7 @@ class AuthController extends Controller
                         'is_approved' => $user->is_approved,
                     ],
                     'store' => $store,
-                    'token' => $token,
+                    
                     'requires_approval' => $user->role === 'client' && !$user->is_approved,
                 ]);
             }

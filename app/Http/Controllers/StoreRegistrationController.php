@@ -252,9 +252,7 @@ class StoreRegistrationController extends Controller
                 }
             }
 
-            // Send OTP email
-            $this->_sendEmailOtp($user->email, 'store');
-
+          
             // Send store registration email with required documents
           
 

@@ -18,48 +18,50 @@ class PurchaseController extends Controller
      * Display a listing of user's purchases
      */
     public function index(Request $request): JsonResponse
-    {
-        $user = Auth::user();
-        
-        $query = Purchase::where('user_id', $user->id)
-            ->with(['offer', 'store','user']);
+{
+    $user = Auth::user();
+    
+    $query = Purchase::where('user_id', $user->id)
+        ->with(['offer', 'store', 'user']);
 
-        // Filter by status if provided
-        if ($request->has('status')) {
-            $query->where('status', $request->status);
-        }
-
-        // Filter by date range if provided
-        if ($request->has('start_date')) {
-            $query->where('purchase_date', '>=', $request->start_date);
-        }
-        if ($request->has('end_date')) {
-            $query->where('purchase_date', '<=', $request->end_date);
-        }
-
-        // Filter by store if provided
-        if ($request->has('store_id')) {
-            $query->where('store_id', $request->store_id);
-        }
-
-        $purchases = $query->orderBy('purchase_date', 'desc')->get();
-
-        // Ensure blob fields are not included in the response
-        $purchases->getCollection()->transform(function ($purchase) {
-            if ($purchase->offer) {
-                $purchase->offer->makeHidden(['image_blob']);
-            }
-            if ($purchase->store) {
-                $purchase->store->makeHidden(['logo_blob', 'banner_blob']);
-            }
-            return $purchase;
-        });
-
-        return response()->json([
-            'message' => 'Purchases retrieved successfully',
-            'data' => $purchases
-        ]);
+    // Filter by status if provided
+    if ($request->has('status')) {
+        $query->where('status', $request->status);
     }
+
+    // Filter by date range if provided
+    if ($request->has('start_date')) {
+        $query->where('purchase_date', '>=', $request->start_date);
+    }
+    if ($request->has('end_date')) {
+        $query->where('purchase_date', '<=', $request->end_date);
+    }
+
+    // Filter by store if provided
+    if ($request->has('store_id')) {
+        $query->where('store_id', $request->store_id);
+    }
+
+    // Retrieve results
+    $purchases = $query->orderBy('purchase_date', 'desc')->get();
+
+    // Hide blob fields
+    $purchases->transform(function ($purchase) {
+        if ($purchase->offer) {
+            $purchase->offer->makeHidden(['image_blob']);
+        }
+        if ($purchase->store) {
+            $purchase->store->makeHidden(['logo_blob', 'banner_blob']);
+        }
+        return $purchase;
+    });
+
+    return response()->json([
+        'message' => 'Purchases retrieved successfully',
+        'data'    => $purchases
+    ]);
+}
+
 
     /**
      * Display the specified purchase

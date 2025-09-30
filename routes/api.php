@@ -236,6 +236,13 @@ Route::middleware('auth:sanctum')->group(function () {
     // Reports
     Route::post('/reports', [ReportController::class, 'store']);
     Route::get('/reports', [ReportController::class, 'getUserReports']);
+
+    // Profanity-protected endpoints: apply middleware class directly
+    Route::middleware(\App\Http\Middleware\ProfanityCheck::class)->group(function () {
+        // Example routes; adapt to your actual endpoints
+        Route::post('/comments', [RatingController::class, 'rateUser']);
+        Route::post('/ratings', [OfferRatingController::class, 'rateOffer']);
+    });
     
     // Offer Ratings
     Route::post('/rate/offer/{id}', [OfferRatingController::class, 'rateOffer']);
@@ -311,6 +318,8 @@ Route::middleware('auth:sanctum')->group(function () {
         // Reports Management
         Route::get('/reports', [AdminController::class, 'getReports']);
         Route::put('/reports/{id}/status', [ReportController::class, 'updateStatus']);
+        Route::post('/reports/{id}/warn', [ReportController::class, 'warnUser']);
+        Route::post('/reports/{id}/delete-user', [ReportController::class, 'deleteUser']);
         
         // Expired Accounts Management
         Route::get('/expired-accounts', [AdminController::class, 'getExpiredAccounts']);
@@ -532,7 +541,7 @@ Route::post('/test-png-upload', function (Request $request) {
         ], 500);
     }
 });
-
+Route::get('/required-documents', [RequiredDocumentsController::class, 'index']);
 // Required Documents routes
 Route::middleware('auth:sanctum')->group(function () {
     // Admin routes for managing required documents

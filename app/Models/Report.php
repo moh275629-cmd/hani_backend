@@ -14,11 +14,19 @@ class Report extends Model
         'reported_user_id',
         'description',
         'status',
+        'is_auto_generated',
+        'profanity_score',
+        'detected_words',
+        'context',
+        'context_id',
+        'original_text_hash',
     ];
 
     protected $casts = [
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
+        'detected_words' => 'array',
+        'profanity_score' => 'float',
     ];
 
     // Relationships
