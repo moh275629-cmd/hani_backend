@@ -11,9 +11,9 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('users', function (Blueprint $table) {
-            if (!Schema::hasColumn('users', 'is_approved')) {
-                $table->boolean('is_approved')->default(false)->after('is_active');
+        Schema::table('offers', function (Blueprint $table) {
+            if (!Schema::hasColumn('offers', 'available_for_delivery')) {
+                $table->boolean('available_for_delivery')->default(false)->after('is_featured');
             }
         });
     }
@@ -23,8 +23,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('users', function (Blueprint $table) {
-            $table->dropColumn('is_approved');
+        Schema::table('offers', function (Blueprint $table) {
+            $table->dropColumn('available_for_delivery');
         });
     }
 };

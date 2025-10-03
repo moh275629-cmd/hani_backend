@@ -11,18 +11,20 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('loyalty_cards', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->foreignId('store_id')->nullable()->constrained()->onDelete('cascade');
-            $table->string('card_number')->unique();
-            $table->string('qr_code')->unique();
-            $table->timestamps();
-            
-            $table->index(['user_id', 'store_id']);
-            $table->index(['card_number']);
-            $table->index(['qr_code']);
-        });
+        if (!Schema::hasTable('loyalty_cards')) {
+            Schema::create('loyalty_cards', function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('user_id')->constrained()->onDelete('cascade');
+                $table->foreignId('store_id')->nullable()->constrained()->onDelete('cascade');
+                $table->string('card_number')->unique();
+                $table->string('qr_code')->unique();
+                $table->timestamps();
+                
+                $table->index(['user_id', 'store_id']);
+                $table->index(['card_number']);
+                $table->index(['qr_code']);
+            });
+        }
     }
 
     /**

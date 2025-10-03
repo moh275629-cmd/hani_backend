@@ -11,7 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('offers', function (Blueprint $table) {
+        if (!Schema::hasTable('offers')) {
+            Schema::create('offers', function (Blueprint $table) {
             $table->id();
             $table->foreignId('store_id')->constrained()->onDelete('cascade');
             $table->string('title');
@@ -37,39 +38,42 @@ return new class extends Migration
             $table->index(['valid_from', 'valid_until']);
             $table->index(['discount_type', 'is_active']);
             $table->index(['is_featured', 'is_active']);
-        });
-        DB::statement('ALTER TABLE offers ADD image_blob LONGBLOB NULL');
+            });
+            DB::statement('ALTER TABLE offers ADD image_blob LONGBLOB NULL');
+        }
        
-        Schema::create('offers_temp', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('store_id')->constrained()->onDelete('cascade');
-            $table->string('title');
-            $table->text('description');
-            $table->string('discount_type');
-            $table->integer('discount_value')->nullable();
-            $table->integer('minimum_purchase')->nullable();
-            $table->integer('max_usage_per_user')->default(1);
-            $table->integer('total_usage_limit')->nullable();
-            $table->integer('current_usage_count')->default(0);
-            $table->timestamp('valid_from')->nullable();
-            $table->timestamp('valid_until')->nullable();
-            $table->json('terms')->nullable();
-            $table->json('applicable_products')->nullable();
-            $table->json('excluded_products')->nullable();
-            $table->boolean('is_active')->default(true);
-            $table->boolean('is_featured')->default(false);
-            $table->string('image')->nullable();
-            // temporary placeholder, will override with raw SQL
-            // $table->binary('image_blob')->nullable();
-            $table->timestamps();
-        
-            $table->index(['valid_from', 'valid_until']);
-            $table->index(['discount_type', 'is_active']);
-            $table->index(['is_featured', 'is_active']);
-        });
-        
-        // Add real LONGBLOB column after table is created
-        DB::statement('ALTER TABLE offers_temp ADD image_blob LONGBLOB NULL');
+        if (!Schema::hasTable('offers_temp')) {
+            Schema::create('offers_temp', function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('store_id')->constrained()->onDelete('cascade');
+                $table->string('title');
+                $table->text('description');
+                $table->string('discount_type');
+                $table->integer('discount_value')->nullable();
+                $table->integer('minimum_purchase')->nullable();
+                $table->integer('max_usage_per_user')->default(1);
+                $table->integer('total_usage_limit')->nullable();
+                $table->integer('current_usage_count')->default(0);
+                $table->timestamp('valid_from')->nullable();
+                $table->timestamp('valid_until')->nullable();
+                $table->json('terms')->nullable();
+                $table->json('applicable_products')->nullable();
+                $table->json('excluded_products')->nullable();
+                $table->boolean('is_active')->default(true);
+                $table->boolean('is_featured')->default(false);
+                $table->string('image')->nullable();
+                // temporary placeholder, will override with raw SQL
+                // $table->binary('image_blob')->nullable();
+                $table->timestamps();
+            
+                $table->index(['valid_from', 'valid_until']);
+                $table->index(['discount_type', 'is_active']);
+                $table->index(['is_featured', 'is_active']);
+            });
+            
+            // Add real LONGBLOB column after table is created
+            DB::statement('ALTER TABLE offers_temp ADD image_blob LONGBLOB NULL');
+        }
         
     }
 

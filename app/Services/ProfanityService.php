@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use Snipe\BanBuilders\CensorWords;
+use Snipe\BanBuilder\CensorWords;
 
 class ProfanityService
 {
@@ -10,7 +10,7 @@ class ProfanityService
 
     public function __construct()
     {
-        $this->censor = new CensorWords(['en-us', 'en-uk', 'fr', 'ar']);
+        $this->censor = new CensorWords();
     }
 
     public function containsProfanity(string $text): bool
@@ -25,9 +25,8 @@ class ProfanityService
 
         $detected = [];
         if (!empty($result['matched'])) {
-            foreach ($result['matched'] as $match) {
-                $word = $match['word'] ?? null;
-                if ($word && !in_array($word, $detected, true)) {
+            foreach ($result['matched'] as $word) {
+                if (!in_array($word, $detected, true)) {
                     $detected[] = $word;
                 }
             }
@@ -81,5 +80,3 @@ class ProfanityService
         return trim($t);
     }
 }
-
-

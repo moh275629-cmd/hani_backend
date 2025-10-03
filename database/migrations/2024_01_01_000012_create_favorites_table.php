@@ -11,17 +11,19 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('favorites', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->string('favorable_type');
-            $table->unsignedBigInteger('favorable_id');
-            $table->timestamps();
-            
-            $table->unique(['user_id', 'favorable_type', 'favorable_id']);
-            $table->index(['favorable_type', 'favorable_id']);
-            $table->index(['user_id']);
-        });
+        if (!Schema::hasTable('favorites')) {
+            Schema::create('favorites', function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('user_id')->constrained()->onDelete('cascade');
+                $table->string('favorable_type');
+                $table->unsignedBigInteger('favorable_id');
+                $table->timestamps();
+                
+                $table->unique(['user_id', 'favorable_type', 'favorable_id']);
+                $table->index(['favorable_type', 'favorable_id']);
+                $table->index(['user_id']);
+            });
+        }
     }
 
     /**

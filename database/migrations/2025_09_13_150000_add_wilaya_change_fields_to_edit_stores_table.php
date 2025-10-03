@@ -12,9 +12,15 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('edit_stores', function (Blueprint $table) {
-            $table->boolean('is_wilaya_change')->default(false)->after('user_state');
-            $table->string('current_wilaya_code', 10)->nullable()->after('is_wilaya_change');
-            $table->string('target_wilaya_code', 10)->nullable()->after('current_wilaya_code');
+            if (!Schema::hasColumn('edit_stores', 'is_wilaya_change')) {
+                $table->boolean('is_wilaya_change')->default(false)->after('user_state');
+            }
+            if (!Schema::hasColumn('edit_stores', 'current_wilaya_code')) {
+                $table->string('current_wilaya_code', 10)->nullable()->after('is_wilaya_change');
+            }
+            if (!Schema::hasColumn('edit_stores', 'target_wilaya_code')) {
+                $table->string('target_wilaya_code', 10)->nullable()->after('current_wilaya_code');
+            }
         });
     }
 

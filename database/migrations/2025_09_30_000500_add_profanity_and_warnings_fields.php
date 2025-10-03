@@ -8,12 +8,24 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::table('reports', function (Blueprint $table) {
-            $table->boolean('is_auto_generated')->default(false);
-            $table->decimal('profanity_score', 5, 2)->nullable()->after('is_auto_generated');
-            $table->json('detected_words')->nullable()->after('profanity_score');
-            $table->string('context')->nullable()->after('detected_words');
-            $table->unsignedBigInteger('context_id')->nullable()->after('context');
-            $table->string('original_text_hash')->nullable()->after('context_id');
+            if (!Schema::hasColumn('reports', 'is_auto_generated')) {
+                $table->boolean('is_auto_generated')->default(false);
+            }
+            if (!Schema::hasColumn('reports', 'profanity_score')) {
+                $table->decimal('profanity_score', 5, 2)->nullable()->after('is_auto_generated');
+            }
+            if (!Schema::hasColumn('reports', 'detected_words')) {
+                $table->json('detected_words')->nullable()->after('profanity_score');
+            }
+            if (!Schema::hasColumn('reports', 'context')) {
+                $table->string('context')->nullable()->after('detected_words');
+            }
+            if (!Schema::hasColumn('reports', 'context_id')) {
+                $table->unsignedBigInteger('context_id')->nullable()->after('context');
+            }
+            if (!Schema::hasColumn('reports', 'original_text_hash')) {
+                $table->string('original_text_hash')->nullable()->after('context_id');
+            }
         });
 
         Schema::table('users', function (Blueprint $table) {

@@ -866,6 +866,10 @@ class AdminController extends Controller
             'phone' => 'required|string|max:20',
             'email' => 'required|email|max:255',
             'website' => 'nullable|url|max:255',
+            'facebook' => 'nullable|url|max:255',
+            'instagram' => 'nullable|url|max:255',
+            'tiktok' => 'nullable|url|max:255',
+            'business_gmail' => 'nullable|email|max:255',
             'address' => 'required|string|max:500',
             'city' => 'required|string|max:100',
             'state' => 'required|string|max:100',
@@ -920,6 +924,10 @@ class AdminController extends Controller
                 'phone' => $request->phone,
                 'email' => $request->email,
                 'website' => $request->website,
+                'facebook' => $request->facebook,
+                'instagram' => $request->instagram,
+                'tiktok' => $request->tiktok,
+                'business_gmail' => $request->business_gmail,
                 'address' => $request->address,
                 'city' => $request->city,
                 'state' => $request->state,
@@ -1911,6 +1919,108 @@ $offers->transform(function ($offer) {
         } catch (\Exception $e) {
             Log::error("Failed to send client approval email to {$user->email}: " . $e->getMessage());
             Log::error("Email error details: " . $e->getTraceAsString());
+        }
+    }
+
+    /**
+     * Admin: Update individual social media field for a store
+     */
+    public function updateStoreSocialField(Request $request, $storeId): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'field' => 'required|in:facebook,instagram,tiktok,business_gmail',
+            'value' => 'nullable|string|max:255',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            $store = Store::find($storeId);
+            if (!$store) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Store not found'
+                ], 404);
+            }
+
+            $field = $request->field;
+            $value = $request->value;
+
+            // Additional validation based on field type
+            if ($field === 'business_gmail' && $value && !filter_var($value, FILTER_VALIDATE_EMAIL)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid email format'
+                ], 422);
+            }
+
+            if (in_array($field, ['facebook', 'instagram', 'tiktok']) && $value && !filter_var($value, FILTER_VALIDATE_URL)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid URL format'
+                ], 422);
+            }
+
+            // Update the specific field
+            $store->update([$field => $value]);
+
+            return response()->json([
+                'success' => true,
+                'message' => ucfirst($field) . ' updated successfully',
+                'data' => [
+                    'field' => $field,
+                    'value' => $value,
+                    'store_id' => $store->id,
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error updating social media field: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Admin: Get store social media fields for management
+     */
+    public function getStoreSocialFields($storeId): JsonResponse
+    {
+        try {
+            $store = Store::find($storeId);
+            if (!$store) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Store not found'
+                ], 404);
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'store_id' => $store->id,
+                    'store_name' => $store->store_name,
+                    'social_fields' => [
+                        'facebook' => $store->facebook,
+                        'instagram' => $store->instagram,
+                        'tiktok' => $store->tiktok,
+                        'business_gmail' => $store->business_gmail,
+                    ]
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error retrieving social media fields: ' . $e->getMessage()
+            ], 500);
         }
     }
 }

@@ -13,11 +13,7 @@ return new class extends Migration
     {
         Schema::table('cities', function (Blueprint $table) {
             // Drop existing FK if present, then recreate with ON UPDATE CASCADE
-            try {
-                $table->dropForeign(['wilaya_code']);
-            } catch (\Throwable $e) {
-                // FK might not exist on some environments; ignore
-            }
+           
 
             $table->foreign('wilaya_code')
                 ->references('code')
@@ -33,19 +29,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('cities', function (Blueprint $table) {
-            try {
-                $table->dropForeign(['wilaya_code']);
-            } catch (\Throwable $e) {
-                // ignore
-            }
-
-            // Recreate without ON UPDATE CASCADE (previous default)
-            $table->foreign('wilaya_code')
-                ->references('code')
-                ->on('wilayas')
-                ->onDelete('cascade');
-        });
+           
+                });
     }
 };
-
-

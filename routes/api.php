@@ -21,7 +21,8 @@ use App\Http\Controllers\CityController;
 use App\Http\Controllers\RequiredDocumentsController;
 use App\Http\Controllers\StoreImageController;
 use App\Http\Controllers\OfferImageController;
-use App\Http\Controllers\DocumentController;
+use App\Http\Controllers\FavoriteController;
+use App\Http\Controllers\ClientController;
 
 
 // Public routes
@@ -230,25 +231,27 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/store/edit-requests/{id}', [App\Http\Controllers\EditStoreController::class, 'cancel']);
     
     // Ratings
-    Route::post('/rate/user/{id}', [RatingController::class, 'rateUser']);
-    Route::get('/ratings/user/{id}', [RatingController::class, 'getUserRatings']);
-    
+    Route::post('/rate/store/{id}', [RatingController::class, 'rateStore']);
+    Route::get('/ratings/store/{id}', [RatingController::class, 'getStoreRatings']);
+    Route::get('/ratings/store/{id}/user', [RatingController::class, 'getUserStoreRating']);
+   
     // Reports
     Route::post('/reports', [ReportController::class, 'store']);
     Route::get('/reports', [ReportController::class, 'getUserReports']);
 
     // Profanity-protected endpoints: apply middleware class directly
-    Route::middleware(\App\Http\Middleware\ProfanityCheck::class)->group(function () {
-        // Example routes; adapt to your actual endpoints
-        Route::post('/comments', [RatingController::class, 'rateUser']);
-        Route::post('/ratings', [OfferRatingController::class, 'rateOffer']);
-    });
-    
-    // Offer Ratings
-    Route::post('/rate/offer/{id}', [OfferRatingController::class, 'rateOffer']);
-    Route::get('/ratings/offer/{id}', [OfferRatingController::class, 'getOfferRatings']);
-    Route::get('/ratings/offer/{id}/user', [OfferRatingController::class, 'getUserOfferRating']);
+   // Remove these lines from the profanity middleware group (around line 125-128):
 
+
+// Keep only these rating routes (they're already protected by auth:sanctum):
+Route::post('/rate/user/{id}', [RatingController::class, 'rateUser']);
+Route::get('/ratings/user/{id}', [RatingController::class, 'getUserRatings']);
+
+// Offer Ratings
+
+Route::post('/rate/offer/{id}', [OfferRatingController::class, 'rateOffer']);
+Route::get('/ratings/offer/{id}', [OfferRatingController::class, 'getOfferRatings']);
+Route::get('/ratings/offer/{id}/user', [OfferRatingController::class, 'getUserOfferRating']);
     // Documents (authenticated user)
     Route::get('/documents/user/{userId}', [DocumentController::class, 'listByUser']);
     Route::delete('/documents/user/{userId}/{documentId}', [DocumentController::class, 'deleteByUser']);
@@ -302,7 +305,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/users/{user}', [AdminController::class, 'user']);
         Route::put('/users/{user}', [AdminController::class, 'updateUserProfile']);
         Route::put('/users/{user}/status', [AdminController::class, 'updateUserStatus']);
-        Route::post('/clients/{userId}/reject', [AdminController::class, 'rejectClient']);
+            Route::get('/stores/{storeId}/social-fields', [AdminController::class, 'getStoreSocialFields']);
+            Route::put('/stores/{storeId}/social-field', [AdminController::class, 'updateStoreSocialField']);
+            Route::post('/clients/{userId}/reject', [AdminController::class, 'rejectClient']);
         Route::get('/stores', [AdminController::class, 'stores']);
         Route::post('/stores', [AdminController::class, 'createStore']);
         Route::put('/stores/{store}', [AdminController::class, 'updateStore']);
@@ -404,6 +409,18 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::delete('/{id}', [CityController::class, 'destroy']);
         });
     });
+    
+    // Favorites
+    Route::post('/favorites', [FavoriteController::class, 'addFavorite']);
+    Route::delete('/favorites/{id}', [FavoriteController::class, 'removeFavoriteById']);
+    Route::delete('/favorites', [FavoriteController::class, 'removeFavoriteByType']);
+    Route::get('/favorites', [FavoriteController::class, 'listFavorites']);
+    
+    // Client profile (for stores to view/rate/report clients)
+    Route::get('/clients/{userId}/profile', [ClientController::class, 'getPublicProfile']);
+    Route::get('/stores/{storeId}/profile', [StoreController::class, 'show']);
+    Route::post('/clients/rate', [ClientController::class, 'rateClient']);
+    Route::post('/clients/report', [ClientController::class, 'reportClient']);
 });
 
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {

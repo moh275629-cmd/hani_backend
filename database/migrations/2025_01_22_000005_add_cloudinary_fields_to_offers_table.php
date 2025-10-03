@@ -12,8 +12,12 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('offers', function (Blueprint $table) {
-            $table->string('main_media_url')->nullable()->after('image_blob');
-            $table->json('gallery_media')->nullable()->after('main_media_url');
+            if (!Schema::hasColumn('offers', 'main_media_url')) {
+                $table->string('main_media_url')->nullable()->after('image_blob');
+            }
+            if (!Schema::hasColumn('offers', 'gallery_media')) {
+                $table->json('gallery_media')->nullable()->after('main_media_url');
+            }
         });
     }
 

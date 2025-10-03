@@ -12,8 +12,12 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('offers', function (Blueprint $table) {
-            $table->decimal('old_price', 10, 2)->nullable()->after('discount_value');
-            $table->boolean('multi_check_enabled')->default(false)->after('is_featured');
+            if (!Schema::hasColumn('offers', 'old_price')) {
+                $table->decimal('old_price', 10, 2)->nullable()->after('discount_value');
+            }
+            if (!Schema::hasColumn('offers', 'multi_check_enabled')) {
+                $table->boolean('multi_check_enabled')->default(false)->after('is_featured');
+            }
         });
     }
 

@@ -11,7 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('edit_stores', function (Blueprint $table) {
+        if (!Schema::hasTable('edit_stores')) {
+            Schema::create('edit_stores', function (Blueprint $table) {
             $table->id();
             $table->foreignId('store_id')->constrained()->onDelete('cascade');
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
@@ -47,7 +48,8 @@ return new class extends Migration
             $table->index(['store_id', 'status']);
             $table->index(['status', 'created_at']);
             $table->index(['state_code', 'status']);
-        });
+            });
+        }
     }
 
     /**

@@ -11,19 +11,21 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('rating_offers', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('rater_id')->constrained('users')->onDelete('cascade');
-            $table->foreignId('rated_offer_id')->constrained('offers')->onDelete('cascade');
-            $table->integer('stars');
-            $table->text('comment')->nullable();
-            $table->timestamps();
-            
-            $table->unique(['rater_id', 'rated_offer_id']);
-            $table->index(['rated_offer_id']);
-            $table->index(['stars']);
-            
-        });
+        if (!Schema::hasTable('rating_offers')) {
+            Schema::create('rating_offers', function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('rater_id')->constrained('users')->onDelete('cascade');
+                $table->foreignId('rated_offer_id')->constrained('offers')->onDelete('cascade');
+                $table->integer('stars');
+                $table->text('comment')->nullable();
+                $table->timestamps();
+                
+                $table->unique(['rater_id', 'rated_offer_id']);
+                $table->index(['rated_offer_id']);
+                $table->index(['stars']);
+                
+            });
+        }
     }
 
     /**

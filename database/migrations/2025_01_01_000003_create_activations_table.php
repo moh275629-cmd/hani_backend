@@ -11,19 +11,21 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('activations', function (Blueprint $table) {
-            $table->id();
-            $table->unsignedBigInteger('user_id');
-            $table->timestamp('approved_at')->nullable();
-            $table->timestamp('deactivate_at')->nullable();
-            $table->timestamps();
-            
-            $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
-            $table->unique('user_id');
-            
-            $table->index(['deactivate_at']);
-            $table->index(['approved_at']);
-        });
+        if (!Schema::hasTable('activations')) {
+            Schema::create('activations', function (Blueprint $table) {
+                $table->id();
+                $table->unsignedBigInteger('user_id');
+                $table->timestamp('approved_at')->nullable();
+                $table->timestamp('deactivate_at')->nullable();
+                $table->timestamps();
+                
+                $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
+                $table->unique('user_id');
+                
+                $table->index(['deactivate_at']);
+                $table->index(['approved_at']);
+            });
+        }
     }
 
     /**

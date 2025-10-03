@@ -700,7 +700,9 @@ if ($request->has('city')) {
                 'old_price' => 'nullable|numeric|min:0',
                 'valid_from' => 'required|date',
                 'valid_until' => 'required|date|after:valid_from',
-                'is_active' => 'boolean'
+                'is_active' => 'boolean',
+                'is_featured' => 'boolean',
+                'available_for_delivery' => 'boolean'
             ]);
 
             if ($validator->fails()) {
@@ -712,7 +714,7 @@ if ($request->has('city')) {
             }
 
             $data = $request->only([
-                'title','description','discount_type','discount_value','minimum_purchase','valid_from','valid_until','is_active','image','terms'
+                'title','description','discount_type','discount_value','minimum_purchase','valid_from','valid_until','is_active','is_featured','available_for_delivery','image','terms'
             ]);
             $data['store_id'] = $store->id;
             
@@ -824,6 +826,8 @@ if ($request->has('city')) {
             'valid_from' => 'sometimes|date',
             'valid_until' => 'sometimes|date|after:valid_from',
             'is_active' => 'sometimes|boolean',
+            'is_featured' => 'sometimes|boolean',
+            'available_for_delivery' => 'sometimes|boolean',
             'old_price' => 'sometimes|numeric|min:0',
             'terms' => 'sometimes|string',
 

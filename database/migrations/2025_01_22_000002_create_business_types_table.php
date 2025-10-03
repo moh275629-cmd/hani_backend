@@ -11,7 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('business_types', function (Blueprint $table) {
+        if (!Schema::hasTable('business_types')) {
+            Schema::create('business_types', function (Blueprint $table) {
             $table->id();
             $table->string('name')->unique();
             $table->string('key')->unique();
@@ -161,13 +162,18 @@ return new class extends Migration
                 'created_at' => now(),
                 'updated_at' => now(),
             ],
-        ]);
+            ]);
 
-        // Add custom business type field to stores table
-        Schema::table('stores', function (Blueprint $table) {
-            $table->string('custom_business_type')->nullable()->after('business_type');
-            $table->boolean('has_custom_business_type')->default(false)->after('custom_business_type');
-        });
+            // Add custom business type field to stores table
+            Schema::table('stores', function (Blueprint $table) {
+                if (!Schema::hasColumn('stores', 'custom_business_type')) {
+                    $table->string('custom_business_type')->nullable()->after('business_type');
+                }
+                if (!Schema::hasColumn('stores', 'has_custom_business_type')) {
+                    $table->boolean('has_custom_business_type')->default(false)->after('custom_business_type');
+                }
+            });
+        }
     }
 
     /**

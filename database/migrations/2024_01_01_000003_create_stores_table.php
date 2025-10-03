@@ -11,7 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('stores', function (Blueprint $table) {
+        if (!Schema::hasTable('stores')) {
+            Schema::create('stores', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->string('store_name');
@@ -47,11 +48,12 @@ return new class extends Migration
             $table->index(['latitude', 'longitude']);
             $table->index(['is_approved', 'is_active']);
             $table->index(['state_code', 'business_type']);
-        });
-        
-        // add blobs with raw SQL after table creation
-        DB::statement('ALTER TABLE stores ADD logo_blob LONGBLOB NULL');
-        DB::statement('ALTER TABLE stores ADD banner_blob LONGBLOB NULL');
+            });
+            
+            // add blobs with raw SQL after table creation
+            DB::statement('ALTER TABLE stores ADD logo_blob LONGBLOB NULL');
+            DB::statement('ALTER TABLE stores ADD banner_blob LONGBLOB NULL');
+        }
         
     }
 

@@ -12,8 +12,12 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('edit_stores', function (Blueprint $table) {
-            $table->json('gallery_images')->nullable()->after('banner');
-            $table->string('main_image_url')->nullable()->after('gallery_images');
+            if (!Schema::hasColumn('edit_stores', 'gallery_images')) {
+                $table->json('gallery_images')->nullable()->after('banner');
+            }
+            if (!Schema::hasColumn('edit_stores', 'main_image_url')) {
+                $table->string('main_image_url')->nullable()->after('gallery_images');
+            }
         });
     }
 

@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "8fa1581a771e0f1c39da9572dacad2b1",
+    "content-hash": "214acd4ddfd4297ab6dd24cf21f361b6",
     "packages": [
         {
             "name": "barryvdh/laravel-dompdf",
@@ -3701,6 +3701,58 @@
                 "source": "https://github.com/MyIntervals/PHP-CSS-Parser/tree/v8.9.0"
             },
             "time": "2025-07-11T13:20:48+00:00"
+        },
+        {
+            "name": "snipe/banbuilder",
+            "version": "2.3.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/snipe/banbuilder.git",
+                "reference": "5e76a97b3ff80e2beaae75ac140c38573ea027a0"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/snipe/banbuilder/zipball/5e76a97b3ff80e2beaae75ac140c38573ea027a0",
+                "reference": "5e76a97b3ff80e2beaae75ac140c38573ea027a0",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=5.6.0"
+            },
+            "require-dev": {
+                "phpunit/phpunit": "^5.7.0"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Snipe\\BanBuilder\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "AGPL-3.0"
+            ],
+            "authors": [
+                {
+                    "name": "snipe",
+                    "email": "snipe@snipe.net",
+                    "role": "Creator & Developer"
+                }
+            ],
+            "description": "Library to easily handle profanity filtering in PHP projects.",
+            "homepage": "http://banbuilder.com",
+            "keywords": [
+                "filter",
+                "language",
+                "profanity",
+                "strings",
+                "swear"
+            ],
+            "support": {
+                "issues": "https://github.com/snipe/banbuilder/issues",
+                "source": "https://github.com/snipe/banbuilder/tree/2.3.1"
+            },
+            "time": "2023-12-06T20:33:58+00:00"
         },
         {
             "name": "symfony/clock",
